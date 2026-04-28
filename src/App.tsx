@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { useState, useEffect } from "react";
 
 // ══════════════════════════════════════════════════════════════════════
@@ -96,6 +95,7 @@ const ACCOUNTS = [
 
 const DEPARTMENTS = ["門市","廚房","外場","行政"];
 const POSITIONS   = ["正職","兼職","工讀"];
+const STATIONS    = ["製作1","製作2","煎台","麵線","烤土司","櫃檯","飲料","包裝","外場","備料"];
 const SHIFTS = [
   { id:"A",   label:"早班", start:"08:00", end:"16:00", color:"#f0a500" },
   { id:"B",   label:"中班", start:"12:00", end:"20:00", color:"#2196f3" },
@@ -189,7 +189,7 @@ export default function App(){
   const [employees,setEmployees]=useState([]);
   const [clockMap,setClockMap]=useState({});
   const [schedMap,setSchedMap]=useState({});
-  const [newEmp,setNewEmp]=useState({name:"",dept:"門市",position:"正職",hourly_rate:185,monthly_rate:28590,salary_type:"monthly"});
+  const [newEmp,setNewEmp]=useState({name:"",dept:"門市",position:"正職",station:"櫃檯",defShift:"A",hourly_rate:185,monthly_rate:28590,salary_type:"monthly"});
   const [showAdd,setShowAdd]=useState(false);
   const [toast,setToast]=useState(null);
   const [loading,setLoading]=useState(false);
@@ -283,7 +283,7 @@ export default function App(){
     {id:"clock",    label:"⏰ 打卡",  ownerOnly:false},
     {id:"schedule", label:"📅 排班",  ownerOnly:false},
     {id:"salary",   label:"💰 薪資",  ownerOnly:true },
-    {id:"employees",label:"👥 員工",  ownerOnly:true },
+    {id:"employees",label:"👥 員工",  ownerOnly:false },
   ].filter(t=>!t.ownerOnly||isOwner);
 
   if(!user) return <Login onLogin={a=>{setUser(a);setTab("clock");}}/>;
@@ -474,26 +474,34 @@ export default function App(){
               <div style={{...S.card,border:"1px solid #f0a500",marginBottom:16}}>
                 <div style={{fontWeight:700,marginBottom:12}}>新增員工</div>
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-                  {[{l:"姓名",k:"name",t:"text"},{l:"時薪(元)",k:"hourly_rate",t:"number"},{l:"月薪(元)",k:"monthly_rate",t:"number"}].map(f=>(
+                  <div>
+                    <div style={{fontSize:11,color:"#8a9ab0",marginBottom:4}}>姓名</div>
+                    <input type="text" value={newEmp.name} onChange={e=>setNewEmp(p=>({...p,name:e.target.value}))} style={S.inp}/>
+                  </div>
+                  {[{l:"部門",k:"dept",o:DEPARTMENTS},{l:"職位",k:"position",o:POSITIONS},{l:"崗位",k:"station",o:STATIONS},{l:"預設班別",k:"defShift",o:SHIFTS.map(s=>s.id)}].map(f=>(
                     <div key={f.k}>
                       <div style={{fontSize:11,color:"#8a9ab0",marginBottom:4}}>{f.l}</div>
-                      <input type={f.t} value={newEmp[f.k]} onChange={e=>setNewEmp(p=>({...p,[f.k]:e.target.value}))} style={S.inp}/>
-                    </div>
-                  ))}
-                  {[{l:"部門",k:"dept",o:DEPARTMENTS},{l:"職位",k:"position",o:POSITIONS}].map(f=>(
-                    <div key={f.k}>
-                      <div style={{fontSize:11,color:"#8a9ab0",marginBottom:4}}>{f.l}</div>
-                      <select value={newEmp[f.k]} onChange={e=>setNewEmp(p=>({...p,[f.k]:e.target.value}))} style={S.sel}>
+                      <select value={newEmp[f.k]||""} onChange={e=>setNewEmp(p=>({...p,[f.k]:e.target.value}))} style={S.sel}>
                         {f.o.map(o=><option key={o}>{o}</option>)}
                       </select>
                     </div>
                   ))}
-                  <div>
-                    <div style={{fontSize:11,color:"#8a9ab0",marginBottom:4}}>薪資類型</div>
-                    <select value={newEmp.salary_type} onChange={e=>setNewEmp(p=>({...p,salary_type:e.target.value}))} style={S.sel}>
-                      <option value="monthly">月薪制</option><option value="hourly">時薪制</option>
-                    </select>
-                  </div>
+                  {isOwner&&<>
+                    <div>
+                      <div style={{fontSize:11,color:"#8a9ab0",marginBottom:4}}>時薪(元)</div>
+                      <input type="number" value={newEmp.hourly_rate} onChange={e=>setNewEmp(p=>({...p,hourly_rate:e.target.value}))} style={S.inp}/>
+                    </div>
+                    <div>
+                      <div style={{fontSize:11,color:"#8a9ab0",marginBottom:4}}>月薪(元)</div>
+                      <input type="number" value={newEmp.monthly_rate} onChange={e=>setNewEmp(p=>({...p,monthly_rate:e.target.value}))} style={S.inp}/>
+                    </div>
+                    <div>
+                      <div style={{fontSize:11,color:"#8a9ab0",marginBottom:4}}>薪資類型</div>
+                      <select value={newEmp.salary_type} onChange={e=>setNewEmp(p=>({...p,salary_type:e.target.value}))} style={S.sel}>
+                        <option value="monthly">月薪制</option><option value="hourly">時薪制</option>
+                      </select>
+                    </div>
+                  </>}
                 </div>
                 <div style={{display:"flex",gap:10,marginTop:12}}>
                   <button onClick={addEmp} style={{flex:1,background:"#f0a500",border:"none",color:"white",borderRadius:8,padding:10,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>確認新增</button>
@@ -507,13 +515,13 @@ export default function App(){
                 <div style={{width:44,height:44,borderRadius:"50%",background:"linear-gradient(135deg,#2a4a6a,#1a2a3a)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20}}>👤</div>
                 <div style={{flex:1}}>
                   <div style={{fontWeight:700,fontSize:15}}>{emp.name}</div>
-                  <div style={{fontSize:12,color:"#8a9ab0"}}>{emp.dept}｜{emp.position}｜{emp.salary_type==="monthly"?"月薪":"時薪制"}</div>
-                  <div style={{fontSize:12,color:"#f0a500",marginTop:2}}>
+                  <div style={{fontSize:12,color:"#8a9ab0"}}>{emp.dept}｜{emp.position}｜{emp.station||"-"}</div>
+                  {isOwner&&<div style={{fontSize:12,color:"#f0a500",marginTop:2}}>
                     時薪：NT$ {emp.hourly_rate}{emp.salary_type==="monthly"?`　月薪：NT$ ${emp.monthly_rate?.toLocaleString()}`:""}
-                  </div>
+                  </div>}
                 </div>
-                <button onClick={()=>delEmp(emp.id)}
-                  style={{background:"#2a1a1a",border:"1px solid #4a2a2a",color:"#e05b00",borderRadius:8,padding:"6px 12px",fontSize:12,cursor:"pointer",fontFamily:"inherit"}}>刪除</button>
+                {isOwner&&<button onClick={()=>delEmp(emp.id)}
+                  style={{background:"#2a1a1a",border:"1px solid #4a2a2a",color:"#e05b00",borderRadius:8,padding:"6px 12px",fontSize:12,cursor:"pointer",fontFamily:"inherit"}}>刪除</button>}
               </div>
             ))}
 
