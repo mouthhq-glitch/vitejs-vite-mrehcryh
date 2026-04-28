@@ -180,6 +180,29 @@ export default function App(){
     }catch(e){toast_("新增失敗："+e.message,"error");}
   }
 
+  function exportCSV(){
+    const rows=[["員工",...monthDays]];
+    employees.forEach(emp=>{
+      const row=[emp.name];
+      monthDays.forEach(d=>{
+        const s=schedMap[`${emp.id}_${d}`];
+        if(!s||!s.station) row.push("");
+        else if(s.station==="休假") row.push("休假");
+        else row.push(`${s.station} ${s.start_time||""}~${s.end_time||""}`);
+      });
+      rows.push(row);
+    });
+    const csv="﻿"+rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(",")).join("\n");
+    const blob=new Blob([csv],{type:"text/csv;charset=utf-8;"});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement("a");
+    a.href=url;
+    a.download=`排班表_${vy}年${vm+1}月.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast_("✅ 排班表已匯出");
+  }
+
   async function delEmp(id){
     if(demo){setEmployees(p=>p.filter(e=>e.id!==id));return;}
     try{await db.del("employees",`?id=eq.${id}`);await loadData();}catch(e){toast_("刪除失敗","error");}
@@ -255,7 +278,10 @@ export default function App(){
             <span style={{fontWeight:700,fontSize:15}}>{vy}年 {vm+1}月</span>
             <button onClick={()=>{if(vm===11){setVm(0);setVy(y=>y+1)}else setVm(m=>m+1)}} style={S.nav}>›</button>
           </div>
-          <div style={{fontSize:12,color:"#8a9ab0",marginBottom:12}}>💡 點格子可設定崗位與上下班時間</div>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
+            <div style={{fontSize:12,color:"#8a9ab0"}}>💡 點格子可設定崗位與上下班時間</div>
+            <button onClick={exportCSV} style={{background:"#1a3a2a",border:"1px solid #4caf50",color:"#4caf50",borderRadius:8,padding:"6px 14px",fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>📥 匯出排班表</button>
+          </div>
           <div style={{overflowX:"auto"}}>
             <table style={{borderCollapse:"collapse",fontSize:12}}>
               <thead><tr>
