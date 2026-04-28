@@ -14,7 +14,7 @@ const db={
 };
 
 const TW_HOLIDAYS=["2025-01-01","2025-01-27","2025-01-28","2025-01-29","2025-01-30","2025-01-31","2025-02-28","2025-04-03","2025-04-04","2025-04-05","2025-05-01","2025-05-31","2025-06-06","2025-09-28","2025-10-10","2026-01-01","2026-02-16","2026-02-17","2026-02-18","2026-02-19","2026-02-20","2026-02-28","2026-04-04","2026-04-05","2026-05-01","2026-06-19","2026-09-28","2026-10-10"];
-const ACCOUNTS=[{username:"boss",password:"boss123",role:"owner",label:"👑 老闆"},{username:"manager",password:"manager123",role:"manager",label:"👔 店長"}];
+const ACCOUNTS=[{username:"boss",password:"25721828",role:"owner",label:"👑 老闆"},{username:"mouth",password:"88888888",role:"manager",label:"👔 店長"}];
 const DEPARTMENTS=["門市","廚房","外場","行政"];
 const POSITIONS=["正職","兼職","工讀"];
 const STATIONS=["製作1","製作2","煎台","麵線","烤土司","櫃檯","飲料","包裝","外場","備料","休假"];
@@ -133,12 +133,9 @@ function Login({onLogin}){
       <div style={{width:340,background:"#131f2e",borderRadius:20,padding:36,border:"1px solid #2a3a4a",boxShadow:"0 20px 60px #00000066"}}>
         <div style={{textAlign:"center",marginBottom:28}}>
           <div style={{width:60,height:60,borderRadius:16,background:"linear-gradient(135deg,#f0a500,#e05b00)",display:"inline-flex",alignItems:"center",justifyContent:"center",fontSize:28,marginBottom:10}}>🏢</div>
-          <div style={{fontWeight:700,fontSize:20,color:"#e8e0d0"}}>台灣勞基法人資系統</div>
+          <div style={{fontWeight:700,fontSize:20,color:"#e8e0d0"}}>卯食豐原</div>
         </div>
-        <div style={{background:"#1a2a3a",borderRadius:10,padding:12,marginBottom:18,fontSize:11,color:"#8a9ab0",lineHeight:2}}>
-          <div style={{color:"#f0a500",fontWeight:600,marginBottom:2}}>測試帳號</div>
-          <div>👑 老闆：boss / boss123</div><div>👔 店長：manager / manager123</div>
-        </div>
+
         <div style={{marginBottom:14}}><div style={{fontSize:12,color:"#8a9ab0",marginBottom:6}}>帳號</div><input value={u} onChange={e=>su(e.target.value)} onKeyDown={e=>e.key==="Enter"&&go()} style={inp}/></div>
         <div style={{marginBottom:18}}><div style={{fontSize:12,color:"#8a9ab0",marginBottom:6}}>密碼</div><input type="password" value={p} onChange={e=>sp(e.target.value)} onKeyDown={e=>e.key==="Enter"&&go()} style={inp}/></div>
         {err&&<div style={{color:"#e05b00",fontSize:12,marginBottom:12,textAlign:"center"}}>⚠ {err}</div>}
@@ -287,7 +284,7 @@ export default function App(){
       <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet"/>
       <div style={{background:"linear-gradient(135deg,#1a2a3a,#0f1923)",borderBottom:"1px solid #2a3a4a",padding:"12px 16px",display:"flex",alignItems:"center",gap:10}}>
         <div style={{width:38,height:38,borderRadius:10,background:"linear-gradient(135deg,#f0a500,#e05b00)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18}}>🏢</div>
-        <div style={{flex:1}}><div style={{fontWeight:700,fontSize:16}}>台灣勞基法人資系統</div><div style={{fontSize:11,color:"#8a9ab0"}}>{today}</div></div>
+        <div style={{flex:1}}><div style={{fontWeight:700,fontSize:16}}>卯食豐原</div><div style={{fontSize:11,color:"#8a9ab0"}}>{today}</div></div>
         <div style={{background:isOwner?"#3a2a0a":"#1a2a3a",border:`1px solid ${isOwner?"#f0a500":"#4a6a8a"}`,borderRadius:20,padding:"4px 12px",fontSize:12,color:isOwner?"#f0a500":"#8ab0d0",fontWeight:600}}>{user.label}</div>
         <button onClick={()=>setUser(null)} style={{background:"#2a1a1a",border:"1px solid #4a2a2a",color:"#e05b00",borderRadius:8,padding:"6px 10px",fontSize:12,cursor:"pointer",fontFamily:"inherit"}}>登出</button>
       </div>
