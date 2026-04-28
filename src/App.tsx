@@ -380,21 +380,20 @@ export default function App(){
         {tab==="schedule"&&employees.length>0&&<div style={{marginTop:16,...S.card}}>
           <div style={{fontWeight:600,fontSize:13,marginBottom:10,color:"#e8e0d0"}}>📊 本月休假統計（應休 {MONTHLY_REST_DAYS} 天）</div>
           <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
-            {employees.map(emp=>{
+            {employees.filter(emp=>emp.salary_type==="monthly").map(emp=>{
               const schedRecs=monthSchedRecs(emp.id);
               const restDays=schedRecs.filter(s=>s&&s.station==="休假").length;
-              const isMonthly=emp.salary_type==="monthly";
-              const missing=isMonthly?Math.max(0,MONTHLY_REST_DAYS-restDays):0;
+              const missing=Math.max(0,MONTHLY_REST_DAYS-restDays);
               return(
                 <div key={emp.id} style={{background:"#0f1923",borderRadius:8,padding:"8px 12px",minWidth:120,border:`1px solid ${missing>0?"#f0a50066":"#2a3a4a"}`}}>
                   <div style={{fontWeight:600,fontSize:13}}>{emp.name}</div>
                   <div style={{fontSize:12,color:missing>0?"#f0a500":"#4caf50",marginTop:4}}>
-                    {isMonthly
-                      ? <>已休 {restDays} 天 {missing>0?`⚠️ 少休 ${missing} 天`:"✅"}</>
-                      : <span style={{color:"#8a9ab0"}}>已休 {restDays} 天（彈性）</span>}
+                    已休 {restDays} 天 {missing>0?`⚠️ 少休 ${missing} 天`:"✅"}
                   </div>
                 </div>);
             })}
+            {employees.filter(emp=>emp.salary_type==="monthly").length===0&&
+              <div style={{fontSize:12,color:"#8a9ab0"}}>本月無正職員工排班記錄</div>}
           </div>
         </div>}
 
