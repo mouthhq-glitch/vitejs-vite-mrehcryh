@@ -19,40 +19,102 @@ const DEPARTMENTS=["門市","廚房","外場","行政"];
 const POSITIONS=["正職","兼職","工讀"];
 const STATIONS=["製作1","製作2","煎台","麵線","烤土司","櫃檯","飲料","包裝","外場","備料"];
 const SHIFTS=[{id:"A",label:"早班",start:"08:00",end:"16:00",color:"#f0a500"},{id:"B",label:"中班",start:"12:00",end:"20:00",color:"#2196f3"},{id:"C",label:"晚班",start:"16:00",end:"00:00",color:"#9c27b0"},{id:"D",label:"全天",start:"08:00",end:"20:00",color:"#4caf50"},{id:"OFF",label:"休假",start:"",end:"",color:"#666"}];
-const DEMO_EMP=[{id:1,name:"王小明",dept:"門市",position:"正職",station:"櫃檯",hourly_rate:185,monthly_rate:28590,salary_type:"monthly"},{id:2,name:"李小花",dept:"外場",position:"兼職",station:"外場",hourly_rate:185,monthly_rate:0,salary_type:"hourly"},{id:3,name:"陳大偉",dept:"廚房",position:"正職",station:"煎台",hourly_rate:200,monthly_rate:32000,salary_type:"monthly"},{id:4,name:"林美麗",dept:"行政",position:"工讀",station:"櫃檯",hourly_rate:185,monthly_rate:0,salary_type:"hourly"}];
+const DEMO_EMP=[
+  {id:1,name:"王小明",dept:"門市",position:"正職",start_time:"08:00",end_time:"16:00",hourly_rate:185,monthly_rate:28590,salary_type:"monthly"},
+  {id:2,name:"李小花",dept:"外場",position:"兼職",start_time:"12:00",end_time:"20:00",hourly_rate:185,monthly_rate:0,salary_type:"hourly"},
+  {id:3,name:"陳大偉",dept:"廚房",position:"正職",start_time:"08:00",end_time:"16:00",hourly_rate:200,monthly_rate:32000,salary_type:"monthly"},
+  {id:4,name:"林美麗",dept:"行政",position:"工讀",start_time:"09:00",end_time:"17:00",hourly_rate:185,monthly_rate:0,salary_type:"hourly"},
+];
 const isHol=d=>TW_HOLIDAYS.includes(d);
 const isWk=d=>{const w=new Date(d).getDay();return w===0||w===6;};
 const fmt=d=>d.toISOString().split("T")[0];
 const getDays=(y,m)=>new Date(y,m+1,0).getDate();
-function calcWage(emp,recs){let reg=0,ot1=0,ot2=0,hol=0;recs.forEach(r=>{if(!r.check_in||!r.check_out)return;let h=(new Date(`${r.work_date}T${r.check_out}`)-new Date(`${r.work_date}T${r.check_in}`))/3600000;if(h<0)h+=24;h=Math.max(0,h-0.5);if(isHol(r.work_date)||isWk(r.work_date))hol+=h;else if(h<=8)reg+=h;else if(h<=10){reg+=8;ot1+=h-8;}else{reg+=8;ot1+=2;ot2+=h-10;}});const rate=emp.hourly_rate,base=emp.salary_type==="monthly"?emp.monthly_rate:reg*rate,ot=ot1*rate*1.34+ot2*rate*1.67,hp=hol*rate*2;return{reg,ot1,ot2,hol,base,ot,hp,total:base+ot+hp};}
+function calcWage(emp,recs){
+  let reg=0,ot1=0,ot2=0,hol=0;
+  recs.forEach(r=>{
+    if(!r.check_in||!r.check_out)return;
+    let h=(new Date(`${r.work_date}T${r.check_out}`)-new Date(`${r.work_date}T${r.check_in}`))/3600000;
+    if(h<0)h+=24;h=Math.max(0,h-0.5);
+    if(isHol(r.work_date)||isWk(r.work_date))hol+=h;
+    else if(h<=8)reg+=h;
+    else if(h<=10){reg+=8;ot1+=h-8;}
+    else{reg+=8;ot1+=2;ot2+=h-10;}
+  });
+  const rate=emp.hourly_rate,base=emp.salary_type==="monthly"?emp.monthly_rate:reg*rate,ot=ot1*rate*1.34+ot2*rate*1.67,hp=hol*rate*2;
+  return{reg,ot1,ot2,hol,base,ot,hp,total:base+ot+hp};
+}
+
+// 排班彈窗元件
+function ShiftPopup({emp,date,current,onSave,onClose}){
+  const[shift,setShift]=useState(current?.shift_id||"");
+  const[station,setStation]=useState(current?.station||"");
+  const sh=SHIFTS.find(s=>s.id===shift);
+  return(
+    <div style={{position:"fixed",inset:0,background:"#00000088",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={onClose}>
+      <div style={{background:"#1a2a3a",borderRadius:16,padding:24,width:280,border:"1px solid #2a3a4a",boxShadow:"0 20px 60px #000"}} onClick={e=>e.stopPropagation()}>
+        <div style={{fontWeight:700,fontSize:15,marginBottom:4}}>{emp.name}</div>
+        <div style={{fontSize:12,color:"#8a9ab0",marginBottom:16}}>{date}</div>
+        <div style={{marginBottom:12}}>
+          <div style={{fontSize:11,color:"#8a9ab0",marginBottom:6}}>班別</div>
+          <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+            {SHIFTS.map(s=>(
+              <button key={s.id} onClick={()=>setShift(s.id)}
+                style={{padding:"6px 12px",borderRadius:8,border:`1px solid ${shift===s.id?s.color:"#3a4a5a"}`,background:shift===s.id?s.color+"33":"#0f1923",color:shift===s.id?s.color:"#8a9ab0",fontSize:12,cursor:"pointer",fontFamily:"inherit"}}>
+                {s.label}
+              </button>))}
+          </div>
+        </div>
+        <div style={{marginBottom:16}}>
+          <div style={{fontSize:11,color:"#8a9ab0",marginBottom:6}}>崗位</div>
+          <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+            <button onClick={()=>setStation("")} style={{padding:"6px 12px",borderRadius:8,border:`1px solid ${station===""?"#f0a500":"#3a4a5a"}`,background:station===""?"#f0a50033":"#0f1923",color:station===""?"#f0a500":"#8a9ab0",fontSize:12,cursor:"pointer",fontFamily:"inherit"}}>未指定</button>
+            {STATIONS.map(s=>(
+              <button key={s} onClick={()=>setStation(s)}
+                style={{padding:"6px 12px",borderRadius:8,border:`1px solid ${station===s?"#4caf50":"#3a4a5a"}`,background:station===s?"#4caf5033":"#0f1923",color:station===s?"#4caf50":"#8a9ab0",fontSize:12,cursor:"pointer",fontFamily:"inherit"}}>
+                {s}
+              </button>))}
+          </div>
+        </div>
+        <div style={{display:"flex",gap:10}}>
+          <button onClick={()=>onSave(shift,station)} style={{flex:1,background:"#f0a500",border:"none",color:"white",borderRadius:8,padding:10,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>確認</button>
+          <button onClick={onClose} style={{flex:1,background:"#2a3a4a",border:"none",color:"#e8e0d0",borderRadius:8,padding:10,cursor:"pointer",fontFamily:"inherit"}}>取消</button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function Login({onLogin}){
   const[u,su]=useState("");const[p,sp]=useState("");const[err,se]=useState("");const[busy,sb]=useState(false);
   function go(){se("");sb(true);setTimeout(()=>{const a=ACCOUNTS.find(x=>x.username===u&&x.password===p);if(a)onLogin(a);else{se("帳號或密碼錯誤");sb(false);}},500);}
   const inp={width:"100%",background:"#0f1923",border:"1px solid #2a3a4a",borderRadius:10,padding:"10px 14px",color:"#e8e0d0",fontSize:14,boxSizing:"border-box",fontFamily:"inherit",outline:"none"};
-  return(<div style={{minHeight:"100vh",background:"#0b1520",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Noto Sans TC',sans-serif"}}>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet"/>
-    <div style={{width:340,background:"#131f2e",borderRadius:20,padding:36,border:"1px solid #2a3a4a",boxShadow:"0 20px 60px #00000066"}}>
-      <div style={{textAlign:"center",marginBottom:28}}>
-        <div style={{width:60,height:60,borderRadius:16,background:"linear-gradient(135deg,#f0a500,#e05b00)",display:"inline-flex",alignItems:"center",justifyContent:"center",fontSize:28,marginBottom:10}}>🏢</div>
-        <div style={{fontWeight:700,fontSize:20,color:"#e8e0d0"}}>台灣勞基法人資系統</div>
+  return(
+    <div style={{minHeight:"100vh",background:"#0b1520",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Noto Sans TC',sans-serif"}}>
+      <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet"/>
+      <div style={{width:340,background:"#131f2e",borderRadius:20,padding:36,border:"1px solid #2a3a4a",boxShadow:"0 20px 60px #00000066"}}>
+        <div style={{textAlign:"center",marginBottom:28}}>
+          <div style={{width:60,height:60,borderRadius:16,background:"linear-gradient(135deg,#f0a500,#e05b00)",display:"inline-flex",alignItems:"center",justifyContent:"center",fontSize:28,marginBottom:10}}>🏢</div>
+          <div style={{fontWeight:700,fontSize:20,color:"#e8e0d0"}}>台灣勞基法人資系統</div>
+        </div>
+        <div style={{background:"#1a2a3a",borderRadius:10,padding:12,marginBottom:18,fontSize:11,color:"#8a9ab0",lineHeight:2}}>
+          <div style={{color:"#f0a500",fontWeight:600,marginBottom:2}}>測試帳號</div>
+          <div>👑 老闆：boss / boss123</div><div>👔 店長：manager / manager123</div>
+        </div>
+        <div style={{marginBottom:14}}><div style={{fontSize:12,color:"#8a9ab0",marginBottom:6}}>帳號</div><input value={u} onChange={e=>su(e.target.value)} onKeyDown={e=>e.key==="Enter"&&go()} style={inp}/></div>
+        <div style={{marginBottom:18}}><div style={{fontSize:12,color:"#8a9ab0",marginBottom:6}}>密碼</div><input type="password" value={p} onChange={e=>sp(e.target.value)} onKeyDown={e=>e.key==="Enter"&&go()} style={inp}/></div>
+        {err&&<div style={{color:"#e05b00",fontSize:12,marginBottom:12,textAlign:"center"}}>⚠ {err}</div>}
+        <button onClick={go} disabled={busy} style={{width:"100%",padding:13,background:"linear-gradient(135deg,#f0a500,#e05b00)",border:"none",borderRadius:10,color:"white",fontWeight:700,fontSize:15,cursor:"pointer",fontFamily:"inherit",opacity:busy?0.7:1}}>{busy?"登入中...":"登入"}</button>
       </div>
-      <div style={{background:"#1a2a3a",borderRadius:10,padding:12,marginBottom:18,fontSize:11,color:"#8a9ab0",lineHeight:2}}>
-        <div style={{color:"#f0a500",fontWeight:600,marginBottom:2}}>測試帳號</div>
-        <div>👑 老闆：boss / boss123</div><div>👔 店長：manager / manager123</div>
-      </div>
-      <div style={{marginBottom:14}}><div style={{fontSize:12,color:"#8a9ab0",marginBottom:6}}>帳號</div><input value={u} onChange={e=>su(e.target.value)} onKeyDown={e=>e.key==="Enter"&&go()} style={inp}/></div>
-      <div style={{marginBottom:18}}><div style={{fontSize:12,color:"#8a9ab0",marginBottom:6}}>密碼</div><input type="password" value={p} onChange={e=>sp(e.target.value)} onKeyDown={e=>e.key==="Enter"&&go()} style={inp}/></div>
-      {err&&<div style={{color:"#e05b00",fontSize:12,marginBottom:12,textAlign:"center"}}>⚠ {err}</div>}
-      <button onClick={go} disabled={busy} style={{width:"100%",padding:13,background:"linear-gradient(135deg,#f0a500,#e05b00)",border:"none",borderRadius:10,color:"white",fontWeight:700,fontSize:15,cursor:"pointer",fontFamily:"inherit",opacity:busy?0.7:1}}>{busy?"登入中...":"登入"}</button>
-    </div></div>);
+    </div>
+  );
 }
 
 export default function App(){
   const[user,setUser]=useState(null);const[tab,setTab]=useState("clock");
   const[employees,setEmployees]=useState([]);const[clockMap,setClockMap]=useState({});const[schedMap,setSchedMap]=useState({});
-  const[newEmp,setNewEmp]=useState({name:"",dept:"門市",position:"正職",station:"櫃檯",defShift:"A",hourly_rate:185,monthly_rate:28590,salary_type:"monthly"});
+  const[newEmp,setNewEmp]=useState({name:"",dept:"門市",position:"正職",start_time:"08:00",end_time:"16:00",hourly_rate:185,monthly_rate:28590,salary_type:"monthly"});
   const[showAdd,setShowAdd]=useState(false);const[toast,setToast]=useState(null);const[loading,setLoading]=useState(false);
+  const[popup,setPopup]=useState(null); // {emp, date}
   const now=new Date();const[vy,setVy]=useState(now.getFullYear());const[vm,setVm]=useState(now.getMonth());
   const isOwner=user?.role==="owner";const demo=isDemo();const today=fmt(new Date());
   const monthDays=Array.from({length:getDays(vy,vm)},(_,i)=>`${vy}-${String(vm+1).padStart(2,"0")}-${String(i+1).padStart(2,"0")}`);
@@ -71,7 +133,7 @@ export default function App(){
       ]);
       setEmployees(emps);
       const cm={};clocks.forEach(r=>cm[`${r.employee_id}_${r.work_date}`]=r);setClockMap(cm);
-      const sm={};scheds.forEach(r=>sm[`${r.employee_id}_${r.work_date}`]=r.shift_id);setSchedMap(sm);
+      const sm={};scheds.forEach(r=>sm[`${r.employee_id}_${r.work_date}`]={shift_id:r.shift_id,station:r.station||""});setSchedMap(sm);
     }catch(e){toast_("連線失敗："+e.message,"error");}
     setLoading(false);
   }
@@ -81,21 +143,30 @@ export default function App(){
   async function handleClock(empId,action){
     const t=new Date().toTimeString().slice(0,5);const key=`${empId}_${today}`;
     if(demo){setClockMap(prev=>{const r=prev[key]||{employee_id:empId,work_date:today};return{...prev,[key]:action==="in"?{...r,check_in:t}:{...r,check_out:t}};});toast_(action==="in"?"✅ 上班打卡成功":"👋 下班打卡成功");return;}
-    try{const r=clockMap[key]||{};await db.upsert("clock_records",{employee_id:empId,work_date:today,check_in:action==="in"?t:r.check_in,check_out:action==="out"?t:r.check_out});await loadData();toast_(action==="in"?"✅ 上班打卡成功":"👋 下班打卡成功");}catch(e){toast_("打卡失敗","error");}
+    try{const r=clockMap[key]||{};await db.upsert("clock_records",{employee_id:empId,work_date:today,check_in:action==="in"?t:r.check_in,check_out:action==="out"?t:r.check_out});await loadData();toast_(action==="in"?"✅ 上班打卡成功":"👋 下班打卡成功");}
+    catch(e){toast_("打卡失敗","error");}
   }
 
-  async function handleShift(empId,date,shiftId){
-    setSchedMap(prev=>({...prev,[`${empId}_${date}`]:shiftId}));
+  async function handleShiftSave(emp,date,shiftId,station){
+    const key=`${emp.id}_${date}`;
+    setSchedMap(prev=>({...prev,[key]:{shift_id:shiftId,station}}));
+    setPopup(null);
     if(demo)return;
-    try{await db.upsert("schedules",{employee_id:empId,work_date:date,shift_id:shiftId});}catch(e){toast_("排班儲存失敗","error");}
+    try{await db.upsert("schedules",{employee_id:emp.id,work_date:date,shift_id:shiftId,station});}
+    catch(e){toast_("排班儲存失敗","error");}
   }
 
   async function addEmp(){
     if(!newEmp.name.trim())return toast_("請輸入員工姓名","error");
     if(demo){setEmployees(p=>[...p,{...newEmp,id:Date.now(),hourly_rate:+newEmp.hourly_rate,monthly_rate:+newEmp.monthly_rate}]);setShowAdd(false);toast_("✅ 新增成功（Demo）");return;}
     try{
-      await db.insert("employees",{name:newEmp.name,dept:newEmp.dept,position:newEmp.position,station:newEmp.station,
-        hourly_rate:isOwner?+newEmp.hourly_rate:185,monthly_rate:isOwner?+newEmp.monthly_rate:28590,salary_type:isOwner?newEmp.salary_type:"hourly"});
+      await db.insert("employees",{
+        name:newEmp.name,dept:newEmp.dept,position:newEmp.position,
+        start_time:newEmp.start_time,end_time:newEmp.end_time,
+        hourly_rate:isOwner?+newEmp.hourly_rate:185,
+        monthly_rate:isOwner?+newEmp.monthly_rate:28590,
+        salary_type:isOwner?newEmp.salary_type:"hourly"
+      });
       await loadData();setShowAdd(false);toast_("✅ 員工新增成功");
     }catch(e){toast_("新增失敗："+e.message,"error");}
   }
@@ -126,73 +197,97 @@ export default function App(){
   return(
     <div style={{minHeight:"100vh",background:"#0f1923",color:"#e8e0d0",fontFamily:"'Noto Sans TC',sans-serif"}}>
       <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet"/>
+
       <div style={{background:"linear-gradient(135deg,#1a2a3a,#0f1923)",borderBottom:"1px solid #2a3a4a",padding:"12px 16px",display:"flex",alignItems:"center",gap:10}}>
         <div style={{width:38,height:38,borderRadius:10,background:"linear-gradient(135deg,#f0a500,#e05b00)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18}}>🏢</div>
         <div style={{flex:1}}><div style={{fontWeight:700,fontSize:16}}>台灣勞基法人資系統</div><div style={{fontSize:11,color:"#8a9ab0"}}>{today}</div></div>
         <div style={{background:isOwner?"#3a2a0a":"#1a2a3a",border:`1px solid ${isOwner?"#f0a500":"#4a6a8a"}`,borderRadius:20,padding:"4px 12px",fontSize:12,color:isOwner?"#f0a500":"#8ab0d0",fontWeight:600}}>{user.label}</div>
         <button onClick={()=>setUser(null)} style={{background:"#2a1a1a",border:"1px solid #4a2a2a",color:"#e05b00",borderRadius:8,padding:"6px 10px",fontSize:12,cursor:"pointer",fontFamily:"inherit"}}>登出</button>
       </div>
-      {!isOwner&&<div style={{background:"#1a2a0a",borderBottom:"1px solid #3a4a2a",padding:"8px 16px",fontSize:12,color:"#8ab060"}}>🔒 店長模式：可操作打卡、排班、新增員工，薪資資訊僅老闆可查看</div>}
+      {!isOwner&&<div style={{background:"#1a2a0a",borderBottom:"1px solid #3a4a2a",padding:"8px 16px",fontSize:12,color:"#8ab060"}}>🔒 店長模式：可操作打卡、排班（含崗位）、新增員工，薪資僅老闆可查看</div>}
+
       <div style={{display:"flex",background:"#151f2b",borderBottom:"1px solid #2a3a4a"}}>
         {TABS.map(t=>(<button key={t.id} onClick={()=>setTab(t.id)} style={{flex:1,padding:"12px 4px",border:"none",background:"none",color:tab===t.id?"#f0a500":"#8a9ab0",borderBottom:tab===t.id?"2px solid #f0a500":"2px solid transparent",fontSize:13,fontWeight:tab===t.id?700:400,cursor:"pointer",fontFamily:"inherit"}}>{t.label}</button>))}
       </div>
       {loading&&<div style={{textAlign:"center",padding:16,color:"#8a9ab0",fontSize:13}}>⏳ 載入中...</div>}
+
       <div style={{padding:16,maxWidth:900,margin:"0 auto"}}>
 
+        {/* 打卡 */}
         {tab==="clock"&&<div>
           <div style={{fontSize:13,color:"#8a9ab0",marginBottom:14}}>今日：{today}　{isHol(today)?"🎌 國定假日":isWk(today)?"🔵 假日":"⚫ 工作日"}</div>
-          {employees.map(emp=>{const rec=clockMap[`${emp.id}_${today}`]||{};return(
-            <div key={emp.id} style={{...S.card,display:"flex",alignItems:"center",gap:12}}>
-              <div style={{width:42,height:42,borderRadius:"50%",background:"linear-gradient(135deg,#2a4a6a,#1a2a3a)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18}}>👤</div>
-              <div style={{flex:1}}>
-                <div style={{fontWeight:600,fontSize:15}}>{emp.name}</div>
-                <div style={{fontSize:12,color:"#8a9ab0"}}>{emp.dept}｜{emp.station||emp.position}</div>
-                <div style={{fontSize:12,marginTop:4,display:"flex",gap:14}}>
-                  <span style={{color:rec.check_in?"#4caf50":"#555"}}>上班：{rec.check_in||"--:--"}</span>
-                  <span style={{color:rec.check_out?"#f0a500":"#555"}}>下班：{rec.check_out||"--:--"}</span>
+          {employees.map(emp=>{
+            const rec=clockMap[`${emp.id}_${today}`]||{};
+            const sched=schedMap[`${emp.id}_${today}`];
+            const sh=SHIFTS.find(s=>s.id===sched?.shift_id);
+            return(
+              <div key={emp.id} style={{...S.card,display:"flex",alignItems:"center",gap:12}}>
+                <div style={{width:42,height:42,borderRadius:"50%",background:"linear-gradient(135deg,#2a4a6a,#1a2a3a)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18}}>👤</div>
+                <div style={{flex:1}}>
+                  <div style={{fontWeight:600,fontSize:15}}>{emp.name}</div>
+                  <div style={{fontSize:12,color:"#8a9ab0",display:"flex",gap:8,flexWrap:"wrap"}}>
+                    <span>{emp.dept}｜{emp.position}</span>
+                    {sched?.station&&<span style={{color:"#4caf50"}}>📍{sched.station}</span>}
+                    {sh&&<span style={{color:sh.color}}>⏰{sh.label}</span>}
+                  </div>
+                  <div style={{fontSize:12,marginTop:4,display:"flex",gap:14}}>
+                    <span style={{color:rec.check_in?"#4caf50":"#555"}}>上班：{rec.check_in||"--:--"}</span>
+                    <span style={{color:rec.check_out?"#f0a500":"#555"}}>下班：{rec.check_out||"--:--"}</span>
+                  </div>
                 </div>
-              </div>
-              <div style={{display:"flex",gap:8,flexWrap:"wrap",justifyContent:"flex-end"}}>
-                <button onClick={()=>handleClock(emp.id,"in")} disabled={!!rec.check_in} style={{padding:"8px 12px",borderRadius:8,border:"none",fontFamily:"inherit",background:rec.check_in?"#2a3a4a":"#4caf50",color:"white",fontSize:12,fontWeight:600,cursor:rec.check_in?"not-allowed":"pointer"}}>上班打卡</button>
-                <button onClick={()=>handleClock(emp.id,"out")} disabled={!rec.check_in||!!rec.check_out} style={{padding:"8px 12px",borderRadius:8,border:"none",fontFamily:"inherit",background:(!rec.check_in||rec.check_out)?"#2a3a4a":"#f0a500",color:"white",fontSize:12,fontWeight:600,cursor:(!rec.check_in||rec.check_out)?"not-allowed":"pointer"}}>下班打卡</button>
-              </div>
-            </div>);})}
+                <div style={{display:"flex",gap:8,flexWrap:"wrap",justifyContent:"flex-end"}}>
+                  <button onClick={()=>handleClock(emp.id,"in")} disabled={!!rec.check_in} style={{padding:"8px 12px",borderRadius:8,border:"none",fontFamily:"inherit",background:rec.check_in?"#2a3a4a":"#4caf50",color:"white",fontSize:12,fontWeight:600,cursor:rec.check_in?"not-allowed":"pointer"}}>上班打卡</button>
+                  <button onClick={()=>handleClock(emp.id,"out")} disabled={!rec.check_in||!!rec.check_out} style={{padding:"8px 12px",borderRadius:8,border:"none",fontFamily:"inherit",background:(!rec.check_in||rec.check_out)?"#2a3a4a":"#f0a500",color:"white",fontSize:12,fontWeight:600,cursor:(!rec.check_in||rec.check_out)?"not-allowed":"pointer"}}>下班打卡</button>
+                </div>
+              </div>);})}
         </div>}
 
+        {/* 排班（點格子開彈窗選班別+崗位）*/}
         {tab==="schedule"&&<div>
           <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14}}>
             <button onClick={()=>{if(vm===0){setVm(11);setVy(y=>y-1)}else setVm(m=>m-1)}} style={S.nav}>‹</button>
             <span style={{fontWeight:700,fontSize:15}}>{vy}年 {vm+1}月</span>
             <button onClick={()=>{if(vm===11){setVm(0);setVy(y=>y+1)}else setVm(m=>m+1)}} style={S.nav}>›</button>
           </div>
-          <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:12}}>{SHIFTS.map(s=>(<span key={s.id} style={{background:s.color+"33",color:s.color,border:`1px solid ${s.color}66`,borderRadius:6,padding:"2px 10px",fontSize:12}}>{s.label}{s.start?` ${s.start}-${s.end}`:""}</span>))}</div>
+          <div style={{fontSize:12,color:"#8a9ab0",marginBottom:12}}>💡 點格子可選班別與崗位</div>
+          <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:12}}>
+            {SHIFTS.map(s=>(<span key={s.id} style={{background:s.color+"33",color:s.color,border:`1px solid ${s.color}66`,borderRadius:6,padding:"2px 8px",fontSize:11}}>{s.label}{s.start?` ${s.start}-${s.end}`:""}</span>))}
+          </div>
           <div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
             <thead><tr>
               <th style={{padding:"8px 6px",textAlign:"left",color:"#8a9ab0",borderBottom:"1px solid #2a3a4a",minWidth:70}}>員工</th>
-              {monthDays.map(d=>{const day=parseInt(d.split("-")[2]);const iH=isHol(d)||isWk(d);return<th key={d} style={{padding:"4px 2px",textAlign:"center",color:iH?"#f0a500":"#8a9ab0",borderBottom:"1px solid #2a3a4a",minWidth:34}}>{day}{iH&&<div style={{fontSize:9}}>假</div>}</th>;})}
+              {monthDays.map(d=>{const day=parseInt(d.split("-")[2]);const iH=isHol(d)||isWk(d);return<th key={d} style={{padding:"4px 2px",textAlign:"center",color:iH?"#f0a500":"#8a9ab0",borderBottom:"1px solid #2a3a4a",minWidth:40}}>{day}{iH&&<div style={{fontSize:9}}>假</div>}</th>;})}
             </tr></thead>
             <tbody>{employees.map(emp=>(<tr key={emp.id}>
               <td style={{padding:"6px",color:"#e8e0d0",borderBottom:"1px solid #1a2a3a",fontSize:12,whiteSpace:"nowrap"}}>{emp.name}</td>
-              {monthDays.map(d=>{const key=`${emp.id}_${d}`;const sid=schedMap[key]||"";const sh=SHIFTS.find(s=>s.id===sid);return(
-                <td key={d} style={{padding:"2px",borderBottom:"1px solid #1a2a3a",textAlign:"center"}}>
-                  <select value={sid} onChange={e=>handleShift(emp.id,d,e.target.value)} style={{width:36,background:sh?sh.color+"44":"#2a3a4a",color:sh?sh.color:"#666",border:"1px solid #3a4a5a",borderRadius:4,fontSize:10,padding:"1px",fontFamily:"inherit",cursor:"pointer"}}>
-                    <option value="">-</option>{SHIFTS.map(s=><option key={s.id} value={s.id}>{s.id}</option>)}
-                  </select>
-                </td>);})}
+              {monthDays.map(d=>{
+                const key=`${emp.id}_${d}`;
+                const sched=schedMap[key];
+                const sh=SHIFTS.find(s=>s.id===sched?.shift_id);
+                return(
+                  <td key={d} style={{padding:"2px",borderBottom:"1px solid #1a2a3a",textAlign:"center"}}>
+                    <button onClick={()=>setPopup({emp,date:d})}
+                      style={{width:38,height:38,borderRadius:6,border:`1px solid ${sh?sh.color+"66":"#3a4a5a"}`,background:sh?sh.color+"22":"#2a3a4a",cursor:"pointer",padding:2,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:1}}>
+                      {sh?<span style={{color:sh.color,fontSize:9,fontWeight:700}}>{sh.id}</span>:<span style={{color:"#555",fontSize:9}}>-</span>}
+                      {sched?.station?<span style={{color:"#4caf50",fontSize:8,lineHeight:1}}>{sched.station.slice(0,2)}</span>:null}
+                    </button>
+                  </td>);})}
             </tr>))}</tbody>
           </table></div>
         </div>}
 
+        {/* 薪資（老闆限定）*/}
         {tab==="salary"&&isOwner&&<div>
           <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14}}>
             <button onClick={()=>{if(vm===0){setVm(11);setVy(y=>y-1)}else setVm(m=>m-1)}} style={S.nav}>‹</button>
             <span style={{fontWeight:700,fontSize:15}}>{vy}年 {vm+1}月 薪資計算</span>
             <button onClick={()=>{if(vm===11){setVm(0);setVy(y=>y+1)}else setVm(m=>m+1)}} style={S.nav}>›</button>
           </div>
+          <div style={{fontSize:11,color:"#8a9ab0",marginBottom:12}}>勞基法：平日加班前2h ×1.34、第3h起 ×1.67；假日 ×2</div>
           {employees.map(emp=>{const recs=monthRecs(emp.id);const w=calcWage(emp,recs);return(
             <div key={emp.id} style={S.card}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-                <div><span style={{fontWeight:700,fontSize:15}}>{emp.name}</span><span style={{color:"#8a9ab0",fontSize:12,marginLeft:8}}>{emp.dept}｜{emp.station||emp.position}</span></div>
+                <div><span style={{fontWeight:700,fontSize:15}}>{emp.name}</span><span style={{color:"#8a9ab0",fontSize:12,marginLeft:8}}>{emp.dept}｜{emp.position}</span></div>
                 <div style={{fontSize:20,fontWeight:700,color:"#f0a500"}}>NT$ {Math.round(w.total).toLocaleString()}</div>
               </div>
               <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,fontSize:12}}>
@@ -205,6 +300,7 @@ export default function App(){
             </div>);})}
         </div>}
 
+        {/* 員工管理 */}
         {tab==="employees"&&<div>
           <button onClick={()=>setShowAdd(true)} style={{background:"linear-gradient(135deg,#f0a500,#e05b00)",border:"none",color:"white",borderRadius:10,padding:"10px 20px",fontWeight:700,fontSize:13,cursor:"pointer",marginBottom:16,fontFamily:"inherit"}}>＋ 新增員工</button>
 
@@ -212,12 +308,14 @@ export default function App(){
             <div style={{fontWeight:700,marginBottom:12}}>新增員工</div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
               <div><div style={{fontSize:11,color:"#8a9ab0",marginBottom:4}}>姓名</div><input value={newEmp.name} onChange={e=>setNewEmp(p=>({...p,name:e.target.value}))} style={S.inp}/></div>
-              {[{l:"部門",k:"dept",o:DEPARTMENTS},{l:"職位",k:"position",o:POSITIONS},{l:"崗位",k:"station",o:STATIONS},{l:"預設班別",k:"defShift",o:SHIFTS.map(s=>s.id)}].map(f=>(
+              {[{l:"部門",k:"dept",o:DEPARTMENTS},{l:"職位",k:"position",o:POSITIONS}].map(f=>(
                 <div key={f.k}><div style={{fontSize:11,color:"#8a9ab0",marginBottom:4}}>{f.l}</div>
                   <select value={newEmp[f.k]||""} onChange={e=>setNewEmp(p=>({...p,[f.k]:e.target.value}))} style={S.sel}>
                     {f.o.map(o=><option key={o}>{o}</option>)}
                   </select>
                 </div>))}
+              <div><div style={{fontSize:11,color:"#8a9ab0",marginBottom:4}}>上班時間</div><input type="time" value={newEmp.start_time||"08:00"} onChange={e=>setNewEmp(p=>({...p,start_time:e.target.value}))} style={S.inp}/></div>
+              <div><div style={{fontSize:11,color:"#8a9ab0",marginBottom:4}}>下班時間</div><input type="time" value={newEmp.end_time||"16:00"} onChange={e=>setNewEmp(p=>({...p,end_time:e.target.value}))} style={S.inp}/></div>
               {isOwner&&<>
                 <div><div style={{fontSize:11,color:"#8a9ab0",marginBottom:4}}>時薪(元)</div><input type="number" value={newEmp.hourly_rate} onChange={e=>setNewEmp(p=>({...p,hourly_rate:e.target.value}))} style={S.inp}/></div>
                 <div><div style={{fontSize:11,color:"#8a9ab0",marginBottom:4}}>月薪(元)</div><input type="number" value={newEmp.monthly_rate} onChange={e=>setNewEmp(p=>({...p,monthly_rate:e.target.value}))} style={S.inp}/></div>
@@ -239,14 +337,35 @@ export default function App(){
               <div style={{width:44,height:44,borderRadius:"50%",background:"linear-gradient(135deg,#2a4a6a,#1a2a3a)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20}}>👤</div>
               <div style={{flex:1}}>
                 <div style={{fontWeight:700,fontSize:15}}>{emp.name}</div>
-                <div style={{fontSize:12,color:"#8a9ab0"}}>{emp.dept}｜{emp.position}｜{emp.station||"-"}</div>
+                <div style={{fontSize:12,color:"#8a9ab0"}}>{emp.dept}｜{emp.position}</div>
+                <div style={{fontSize:12,color:"#8a9ab0",marginTop:2}}>⏰ {emp.start_time||"--:--"} ～ {emp.end_time||"--:--"}</div>
                 {isOwner&&<div style={{fontSize:12,color:"#f0a500",marginTop:2}}>時薪：NT$ {emp.hourly_rate}{emp.salary_type==="monthly"?`　月薪：NT$ ${emp.monthly_rate?.toLocaleString()}`:""}</div>}
               </div>
               {isOwner&&<button onClick={()=>delEmp(emp.id)} style={{background:"#2a1a1a",border:"1px solid #4a2a2a",color:"#e05b00",borderRadius:8,padding:"6px 12px",fontSize:12,cursor:"pointer",fontFamily:"inherit"}}>刪除</button>}
             </div>))}
+
+          {isOwner&&<div style={{marginTop:16,background:"#1a2a3a",borderRadius:10,padding:12,fontSize:11,color:"#8a9ab0",border:"1px solid #2a4a6a"}}>
+            <div style={{color:"#f0a500",fontWeight:600,marginBottom:6}}>⚠️ 如果新增員工或排班崗位儲存失敗，請在 Supabase SQL Editor 執行：</div>
+            <div style={{background:"#0f1923",borderRadius:6,padding:8,fontFamily:"monospace",fontSize:10,color:"#4a9af0",lineHeight:1.8}}>
+              ALTER TABLE employees ADD COLUMN IF NOT EXISTS start_time text;<br/>
+              ALTER TABLE employees ADD COLUMN IF NOT EXISTS end_time text;<br/>
+              ALTER TABLE schedules ADD COLUMN IF NOT EXISTS station text;
+            </div>
+          </div>}
         </div>}
 
       </div>
+
+      {/* 排班彈窗 */}
+      {popup&&<ShiftPopup
+        emp={popup.emp}
+        date={popup.date}
+        current={schedMap[`${popup.emp.id}_${popup.date}`]}
+        onSave={(shift,station)=>handleShiftSave(popup.emp,popup.date,shift,station)}
+        onClose={()=>setPopup(null)}
+      />}
+
       {toast&&<div style={{position:"fixed",bottom:24,left:"50%",transform:"translateX(-50%)",background:toast.type==="error"?"#4a1a1a":"#1a3a2a",color:toast.type==="error"?"#e05b00":"#4caf50",border:`1px solid ${toast.type==="error"?"#e05b00":"#4caf50"}`,borderRadius:10,padding:"10px 20px",fontSize:13,fontWeight:600,zIndex:9999,whiteSpace:"nowrap"}}>{toast.msg}</div>}
-    </div>);
+    </div>
+  );
 }
