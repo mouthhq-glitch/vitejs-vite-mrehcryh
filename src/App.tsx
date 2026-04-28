@@ -119,8 +119,8 @@ function Login({onLogin}){
 export default function App(){
   const[user,setUser]=useState(null);const[tab,setTab]=useState("clock");
   const[employees,setEmployees]=useState([]);const[clockMap,setClockMap]=useState({});const[schedMap,setSchedMap]=useState({});
-  const[newEmp,setNewEmp]=useState({name:"",dept:"門市",position:"正職",hourly_rate:185,monthly_rate:28590,salary_type:"monthly"});
-  const[showAdd,setShowAdd]=useState(false);const[toast,setToast]=useState(null);const[loading,setLoading]=useState(false);
+  const[newEmp,setNewEmp]=useState({name:"",dept:"門市",position:"正職",phone:"",id_number:"",join_date:"",note:"",hourly_rate:185,monthly_rate:28590,salary_type:"monthly"});
+  const[showAdd,setShowAdd]=useState(false);const[editEmp,setEditEmp]=useState(null);const[toast,setToast]=useState(null);const[loading,setLoading]=useState(false);
   const[popup,setPopup]=useState(null);
   const now=new Date();const[vy,setVy]=useState(now.getFullYear());const[vm,setVm]=useState(now.getMonth());
   const isOwner=user?.role==="owner";const demo=isDemo();const today=fmt(new Date());
@@ -213,6 +213,17 @@ export default function App(){
     a.click();
     URL.revokeObjectURL(url);
     toast_("✅ 排班表已匯出");
+  }
+
+  async function updateEmp(){
+    if(!editEmp.name.trim())return toast_("請輸入員工姓名","error");
+    if(demo){setEmployees(p=>p.map(e=>e.id===editEmp.id?{...editEmp,hourly_rate:+editEmp.hourly_rate,monthly_rate:+editEmp.monthly_rate}:e));setEditEmp(null);toast_("✅ 員工資料已更新");return;}
+    try{
+      const data={name:editEmp.name,dept:editEmp.dept,position:editEmp.position,phone:editEmp.phone||null,id_number:editEmp.id_number||null,join_date:editEmp.join_date||null,note:editEmp.note||null};
+      if(isOwner){data.hourly_rate=+editEmp.hourly_rate;data.monthly_rate=+editEmp.monthly_rate;data.salary_type=editEmp.salary_type;}
+      await fetch(`${SUPABASE_URL}/rest/v1/employees?id=eq.${editEmp.id}`,{method:"PATCH",headers:dbH(),body:JSON.stringify(data)});
+      await loadData();setEditEmp(null);toast_("✅ 員工資料已更新");
+    }catch(e){toast_("更新失敗："+e.message,"error");}
   }
 
   async function delEmp(id){
@@ -369,6 +380,10 @@ export default function App(){
                     {f.o.map(o=><option key={o}>{o}</option>)}
                   </select>
                 </div>))}
+              <div><div style={{fontSize:11,color:"#8a9ab0",marginBottom:4}}>電話</div><input value={newEmp.phone||""} onChange={e=>setNewEmp(p=>({...p,phone:e.target.value}))} style={S.inp}/></div>
+              <div><div style={{fontSize:11,color:"#8a9ab0",marginBottom:4}}>身份證號</div><input value={newEmp.id_number||""} onChange={e=>setNewEmp(p=>({...p,id_number:e.target.value}))} style={S.inp}/></div>
+              <div><div style={{fontSize:11,color:"#8a9ab0",marginBottom:4}}>入職日期</div><input type="date" value={newEmp.join_date||""} onChange={e=>setNewEmp(p=>({...p,join_date:e.target.value}))} style={S.inp}/></div>
+              <div><div style={{fontSize:11,color:"#8a9ab0",marginBottom:4}}>備註</div><input value={newEmp.note||""} onChange={e=>setNewEmp(p=>({...p,note:e.target.value}))} style={S.inp}/></div>
               {isOwner&&<>
                 <div><div style={{fontSize:11,color:"#8a9ab0",marginBottom:4}}>時薪(元)</div><input type="number" value={newEmp.hourly_rate} onChange={e=>setNewEmp(p=>({...p,hourly_rate:e.target.value}))} style={S.inp}/></div>
                 <div><div style={{fontSize:11,color:"#8a9ab0",marginBottom:4}}>月薪(元)</div><input type="number" value={newEmp.monthly_rate} onChange={e=>setNewEmp(p=>({...p,monthly_rate:e.target.value}))} style={S.inp}/></div>
@@ -385,15 +400,56 @@ export default function App(){
             </div>
           </div>}
           {employees.map(emp=>(
-            <div key={emp.id} style={{...S.card,display:"flex",alignItems:"center",gap:12}}>
-              <div style={{width:44,height:44,borderRadius:"50%",background:"linear-gradient(135deg,#2a4a6a,#1a2a3a)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20}}>👤</div>
-              <div style={{flex:1}}>
-                <div style={{fontWeight:700,fontSize:15}}>{emp.name}</div>
-                <div style={{fontSize:12,color:"#8a9ab0"}}>{emp.dept}｜{emp.position}</div>
-                {isOwner&&<div style={{fontSize:12,color:"#f0a500",marginTop:2}}>時薪：NT$ {emp.hourly_rate}{emp.salary_type==="monthly"?`　月薪：NT$ ${emp.monthly_rate?.toLocaleString()}`:""}</div>}
+            <div key={emp.id} style={{...S.card}}>
+              <div style={{display:"flex",alignItems:"center",gap:12}}>
+                <div style={{width:44,height:44,borderRadius:"50%",background:"linear-gradient(135deg,#2a4a6a,#1a2a3a)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20}}>👤</div>
+                <div style={{flex:1}}>
+                  <div style={{fontWeight:700,fontSize:15}}>{emp.name}</div>
+                  <div style={{fontSize:12,color:"#8a9ab0"}}>{emp.dept}｜{emp.position}</div>
+                  {emp.phone&&<div style={{fontSize:12,color:"#8a9ab0"}}>📞 {emp.phone}</div>}
+                  {emp.join_date&&<div style={{fontSize:12,color:"#8a9ab0"}}>📅 入職：{emp.join_date}</div>}
+                  {isOwner&&<div style={{fontSize:12,color:"#f0a500",marginTop:2}}>時薪：NT$ {emp.hourly_rate}{emp.salary_type==="monthly"?`　月薪：NT$ ${emp.monthly_rate?.toLocaleString()}`:""}</div>}
+                  {emp.note&&<div style={{fontSize:11,color:"#666",marginTop:2}}>備註：{emp.note}</div>}
+                </div>
+                <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                  <button onClick={()=>setEditEmp({...emp})} style={{background:"#1a3a5a",border:"1px solid #2a5a8a",color:"#4a9af0",borderRadius:8,padding:"6px 12px",fontSize:12,cursor:"pointer",fontFamily:"inherit"}}>編輯</button>
+                  {isOwner&&<button onClick={()=>delEmp(emp.id)} style={{background:"#2a1a1a",border:"1px solid #4a2a2a",color:"#e05b00",borderRadius:8,padding:"6px 12px",fontSize:12,cursor:"pointer",fontFamily:"inherit"}}>刪除</button>}
+                </div>
               </div>
-              {isOwner&&<button onClick={()=>delEmp(emp.id)} style={{background:"#2a1a1a",border:"1px solid #4a2a2a",color:"#e05b00",borderRadius:8,padding:"6px 12px",fontSize:12,cursor:"pointer",fontFamily:"inherit"}}>刪除</button>}
             </div>))}
+
+          {/* 編輯員工彈窗 */}
+          {editEmp&&<div style={{position:"fixed",inset:0,background:"#00000099",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={()=>setEditEmp(null)}>
+            <div style={{background:"#1a2a3a",borderRadius:16,padding:24,width:"100%",maxWidth:480,border:"1px solid #f0a500",boxShadow:"0 20px 60px #000",maxHeight:"90vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+              <div style={{fontWeight:700,fontSize:16,marginBottom:16}}>✏️ 編輯員工資料</div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                <div style={{gridColumn:"1/-1"}}><div style={{fontSize:11,color:"#8a9ab0",marginBottom:4}}>姓名</div><input value={editEmp.name||""} onChange={e=>setEditEmp(p=>({...p,name:e.target.value}))} style={S.inp}/></div>
+                {[{l:"部門",k:"dept",o:DEPARTMENTS},{l:"職位",k:"position",o:POSITIONS}].map(f=>(
+                  <div key={f.k}><div style={{fontSize:11,color:"#8a9ab0",marginBottom:4}}>{f.l}</div>
+                    <select value={editEmp[f.k]||""} onChange={e=>setEditEmp(p=>({...p,[f.k]:e.target.value}))} style={S.sel}>
+                      {f.o.map(o=><option key={o}>{o}</option>)}
+                    </select>
+                  </div>))}
+                <div><div style={{fontSize:11,color:"#8a9ab0",marginBottom:4}}>電話</div><input value={editEmp.phone||""} onChange={e=>setEditEmp(p=>({...p,phone:e.target.value}))} style={S.inp}/></div>
+                <div><div style={{fontSize:11,color:"#8a9ab0",marginBottom:4}}>身份證號</div><input value={editEmp.id_number||""} onChange={e=>setEditEmp(p=>({...p,id_number:e.target.value}))} style={S.inp}/></div>
+                <div><div style={{fontSize:11,color:"#8a9ab0",marginBottom:4}}>入職日期</div><input type="date" value={editEmp.join_date||""} onChange={e=>setEditEmp(p=>({...p,join_date:e.target.value}))} style={S.inp}/></div>
+                <div><div style={{fontSize:11,color:"#8a9ab0",marginBottom:4}}>備註</div><input value={editEmp.note||""} onChange={e=>setEditEmp(p=>({...p,note:e.target.value}))} style={S.inp}/></div>
+                {isOwner&&<>
+                  <div><div style={{fontSize:11,color:"#8a9ab0",marginBottom:4}}>時薪(元)</div><input type="number" value={editEmp.hourly_rate||185} onChange={e=>setEditEmp(p=>({...p,hourly_rate:e.target.value}))} style={S.inp}/></div>
+                  <div><div style={{fontSize:11,color:"#8a9ab0",marginBottom:4}}>月薪(元)</div><input type="number" value={editEmp.monthly_rate||0} onChange={e=>setEditEmp(p=>({...p,monthly_rate:e.target.value}))} style={S.inp}/></div>
+                  <div><div style={{fontSize:11,color:"#8a9ab0",marginBottom:4}}>薪資類型</div>
+                    <select value={editEmp.salary_type||"hourly"} onChange={e=>setEditEmp(p=>({...p,salary_type:e.target.value}))} style={S.sel}>
+                      <option value="monthly">月薪制</option><option value="hourly">時薪制</option>
+                    </select>
+                  </div>
+                </>}
+              </div>
+              <div style={{display:"flex",gap:10,marginTop:16}}>
+                <button onClick={updateEmp} style={{flex:1,background:"#f0a500",border:"none",color:"white",borderRadius:8,padding:11,fontWeight:700,cursor:"pointer",fontFamily:"inherit",fontSize:14}}>儲存</button>
+                <button onClick={()=>setEditEmp(null)} style={{flex:1,background:"#2a3a4a",border:"none",color:"#e8e0d0",borderRadius:8,padding:11,cursor:"pointer",fontFamily:"inherit",fontSize:14}}>取消</button>
+              </div>
+            </div>
+          </div>}
         </div>}
 
       </div>
