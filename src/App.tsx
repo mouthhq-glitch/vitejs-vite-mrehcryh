@@ -119,7 +119,7 @@ function Login({onLogin}){
 export default function App(){
   const[user,setUser]=useState(null);const[tab,setTab]=useState("clock");
   const[employees,setEmployees]=useState([]);const[clockMap,setClockMap]=useState({});const[schedMap,setSchedMap]=useState({});
-  const[newEmp,setNewEmp]=useState({name:"",dept:"門市",position:"正職",phone:"",id_number:"",join_date:"",note:"",hourly_rate:185,monthly_rate:28590,salary_type:"monthly"});
+  const[newEmp,setNewEmp]=useState({name:"",dept:"門市",position:"正職",phone:"",id_number:"",birthday:"",join_date:"",note:"",hourly_rate:185,monthly_rate:28590,salary_type:"monthly"});
   const[showAdd,setShowAdd]=useState(false);const[editEmp,setEditEmp]=useState(null);const[toast,setToast]=useState(null);const[loading,setLoading]=useState(false);
   const[popup,setPopup]=useState(null);
   const now=new Date();const[vy,setVy]=useState(now.getFullYear());const[vm,setVm]=useState(now.getMonth());
@@ -219,7 +219,7 @@ export default function App(){
     if(!editEmp.name.trim())return toast_("請輸入員工姓名","error");
     if(demo){setEmployees(p=>p.map(e=>e.id===editEmp.id?{...editEmp,hourly_rate:+editEmp.hourly_rate,monthly_rate:+editEmp.monthly_rate}:e));setEditEmp(null);toast_("✅ 員工資料已更新");return;}
     try{
-      const data={name:editEmp.name,dept:editEmp.dept,position:editEmp.position,phone:editEmp.phone||null,id_number:editEmp.id_number||null,join_date:editEmp.join_date||null,note:editEmp.note||null};
+      const data={name:editEmp.name,dept:editEmp.dept,position:editEmp.position,phone:editEmp.phone||null,id_number:editEmp.id_number||null,birthday:editEmp.birthday||null,join_date:editEmp.join_date||null,note:editEmp.note||null};
       if(isOwner){data.hourly_rate=+editEmp.hourly_rate;data.monthly_rate=+editEmp.monthly_rate;data.salary_type=editEmp.salary_type;}
       await fetch(`${SUPABASE_URL}/rest/v1/employees?id=eq.${editEmp.id}`,{method:"PATCH",headers:dbH(),body:JSON.stringify(data)});
       await loadData();setEditEmp(null);toast_("✅ 員工資料已更新");
@@ -382,6 +382,7 @@ export default function App(){
                 </div>))}
               <div><div style={{fontSize:11,color:"#8a9ab0",marginBottom:4}}>電話</div><input value={newEmp.phone||""} onChange={e=>setNewEmp(p=>({...p,phone:e.target.value}))} style={S.inp}/></div>
               <div><div style={{fontSize:11,color:"#8a9ab0",marginBottom:4}}>身份證號</div><input value={newEmp.id_number||""} onChange={e=>setNewEmp(p=>({...p,id_number:e.target.value}))} style={S.inp}/></div>
+              <div><div style={{fontSize:11,color:"#8a9ab0",marginBottom:4}}>生日</div><input type="date" value={newEmp.birthday||""} onChange={e=>setNewEmp(p=>({...p,birthday:e.target.value}))} style={S.inp}/></div>
               <div><div style={{fontSize:11,color:"#8a9ab0",marginBottom:4}}>入職日期</div><input type="date" value={newEmp.join_date||""} onChange={e=>setNewEmp(p=>({...p,join_date:e.target.value}))} style={S.inp}/></div>
               <div><div style={{fontSize:11,color:"#8a9ab0",marginBottom:4}}>備註</div><input value={newEmp.note||""} onChange={e=>setNewEmp(p=>({...p,note:e.target.value}))} style={S.inp}/></div>
               {isOwner&&<>
@@ -407,6 +408,7 @@ export default function App(){
                   <div style={{fontWeight:700,fontSize:15}}>{emp.name}</div>
                   <div style={{fontSize:12,color:"#8a9ab0"}}>{emp.dept}｜{emp.position}</div>
                   {emp.phone&&<div style={{fontSize:12,color:"#8a9ab0"}}>📞 {emp.phone}</div>}
+                  {emp.birthday&&<div style={{fontSize:12,color:"#8a9ab0"}}>🎂 生日：{emp.birthday}</div>}
                   {emp.join_date&&<div style={{fontSize:12,color:"#8a9ab0"}}>📅 入職：{emp.join_date}</div>}
                   {isOwner&&<div style={{fontSize:12,color:"#f0a500",marginTop:2}}>時薪：NT$ {emp.hourly_rate}{emp.salary_type==="monthly"?`　月薪：NT$ ${emp.monthly_rate?.toLocaleString()}`:""}</div>}
                   {emp.note&&<div style={{fontSize:11,color:"#666",marginTop:2}}>備註：{emp.note}</div>}
@@ -432,6 +434,7 @@ export default function App(){
                   </div>))}
                 <div><div style={{fontSize:11,color:"#8a9ab0",marginBottom:4}}>電話</div><input value={editEmp.phone||""} onChange={e=>setEditEmp(p=>({...p,phone:e.target.value}))} style={S.inp}/></div>
                 <div><div style={{fontSize:11,color:"#8a9ab0",marginBottom:4}}>身份證號</div><input value={editEmp.id_number||""} onChange={e=>setEditEmp(p=>({...p,id_number:e.target.value}))} style={S.inp}/></div>
+                <div><div style={{fontSize:11,color:"#8a9ab0",marginBottom:4}}>生日</div><input type="date" value={editEmp.birthday||""} onChange={e=>setEditEmp(p=>({...p,birthday:e.target.value}))} style={S.inp}/></div>
                 <div><div style={{fontSize:11,color:"#8a9ab0",marginBottom:4}}>入職日期</div><input type="date" value={editEmp.join_date||""} onChange={e=>setEditEmp(p=>({...p,join_date:e.target.value}))} style={S.inp}/></div>
                 <div><div style={{fontSize:11,color:"#8a9ab0",marginBottom:4}}>備註</div><input value={editEmp.note||""} onChange={e=>setEditEmp(p=>({...p,note:e.target.value}))} style={S.inp}/></div>
                 {isOwner&&<>
