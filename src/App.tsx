@@ -43,10 +43,15 @@ function calcWage(emp, recs, schedRecs){
     if(isHol(r.work_date)){
       holHours+=h; // 國定假日
     } else {
-      // 週末和平日都算正常工資
-      if(h<=8)reg+=h;
-      else if(h<=10){reg+=8;ot1+=h-8;}
-      else{reg+=8;ot1+=2;ot2+=h-10;}
+      if(emp.salary_type==="monthly"){
+        // 月薪制正職：有加班費計算
+        if(h<=8)reg+=h;
+        else if(h<=10){reg+=8;ot1+=h-8;}
+        else{reg+=8;ot1+=2;ot2+=h-10;}
+      } else {
+        // 時薪制（兼職/工讀）：全部算正常工資
+        reg+=h;
+      }
     }
   });
 
@@ -63,9 +68,9 @@ function calcWage(emp, recs, schedRecs){
 
   const wkPay = 0; // 週末正常工資（已含在reg計算）
 
-  // 月休不足加班費
+  // 月休不足加班費（只適用正職月薪制）
   const actualRestDays=schedRecs?schedRecs.filter(s=>s&&s.station==="休假").length:0;
-  const missingRestDays=Math.max(0,MONTHLY_REST_DAYS-actualRestDays);
+  const missingRestDays=emp.salary_type==="monthly"?Math.max(0,MONTHLY_REST_DAYS-actualRestDays):0;
   const restOTPay=missingRestDays*8*rate*1.34;
 
   const total=base+ot+holPay+wkPay+restOTPay;
@@ -378,12 +383,15 @@ export default function App(){
             {employees.map(emp=>{
               const schedRecs=monthSchedRecs(emp.id);
               const restDays=schedRecs.filter(s=>s&&s.station==="休假").length;
-              const missing=Math.max(0,MONTHLY_REST_DAYS-restDays);
+              const isMonthly=emp.salary_type==="monthly";
+              const missing=isMonthly?Math.max(0,MONTHLY_REST_DAYS-restDays):0;
               return(
                 <div key={emp.id} style={{background:"#0f1923",borderRadius:8,padding:"8px 12px",minWidth:120,border:`1px solid ${missing>0?"#f0a50066":"#2a3a4a"}`}}>
                   <div style={{fontWeight:600,fontSize:13}}>{emp.name}</div>
                   <div style={{fontSize:12,color:missing>0?"#f0a500":"#4caf50",marginTop:4}}>
-                    已休 {restDays} 天 {missing>0?`⚠️ 少休 ${missing} 天`:"✅"}
+                    {isMonthly
+                      ? <>已休 {restDays} 天 {missing>0?`⚠️ 少休 ${missing} 天`:"✅"}</>
+                      : <span style={{color:"#8a9ab0"}}>已休 {restDays} 天（彈性）</span>}
                   </div>
                 </div>);
             })}
@@ -424,7 +432,7 @@ export default function App(){
                     {x.v&&<div style={{color:x.warn?"#f0a500":"#e8e0d0",fontWeight:600,marginTop:2}}>{x.v}</div>}
                   </div>))}
               </div>
-              {w.missingRestDays>0&&<div style={{marginTop:10,background:"#2a1a0a",borderRadius:8,padding:"8px 12px",fontSize:12,color:"#f0a500",border:"1px solid #f0a50044"}}>
+              {emp.salary_type==="monthly"&&w.missingRestDays>0&&<div style={{marginTop:10,background:"#2a1a0a",borderRadius:8,padding:"8px 12px",fontSize:12,color:"#f0a500",border:"1px solid #f0a50044"}}>
                 ⚠️ {emp.name} 本月少休 {w.missingRestDays} 天，需補加班費 NT$ {Math.round(w.restOTPay).toLocaleString()}
               </div>}
             </div>);})}
