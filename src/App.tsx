@@ -30,19 +30,46 @@ const isWk=d=>{const w=new Date(d).getDay();return w===0||w===6;};
 const fmt=d=>d.toISOString().split("T")[0];
 const getDays=(y,m)=>new Date(y,m+1,0).getDate();
 
-function calcWage(emp,recs){
-  let reg=0,ot1=0,ot2=0,hol=0;
+const MONTHLY_REST_DAYS = 8; // 月休天數
+
+function calcWage(emp, recs, schedRecs){
+  let reg=0,ot1=0,ot2=0;
+  let holHours=0; // 國定假日出勤小時
+  let wkHours=0;  // 週休出勤小時
   recs.forEach(r=>{
     if(!r.check_in||!r.check_out)return;
     let h=(new Date(`${r.work_date}T${r.check_out}`)-new Date(`${r.work_date}T${r.check_in}`))/3600000;
     if(h<0)h+=24;h=Math.max(0,h-0.5);
-    if(isHol(r.work_date)||isWk(r.work_date))hol+=h;
-    else if(h<=8)reg+=h;
-    else if(h<=10){reg+=8;ot1+=h-8;}
-    else{reg+=8;ot1+=2;ot2+=h-10;}
+    if(isHol(r.work_date)){
+      holHours+=h; // 國定假日
+    } else {
+      // 週末和平日都算正常工資
+      if(h<=8)reg+=h;
+      else if(h<=10){reg+=8;ot1+=h-8;}
+      else{reg+=8;ot1+=2;ot2+=h-10;}
+    }
   });
-  const rate=emp.hourly_rate,base=emp.salary_type==="monthly"?emp.monthly_rate:reg*rate,ot=ot1*rate*1.34+ot2*rate*1.67,hp=hol*rate*2;
-  return{reg,ot1,ot2,hol,base,ot,hp,total:base+ot+hp};
+
+  const rate=emp.hourly_rate;
+  const base=emp.salary_type==="monthly"?emp.monthly_rate:reg*rate;
+  const ot=ot1*rate*1.34+ot2*rate*1.67;
+
+  // 國定假日加班費（勞基法）
+  // 正職月薪制：原本就有薪，出勤再加1倍
+  // 兼職/工讀時薪制：國定假日不加倍，正常計算（已含在reg）
+  const holPay = emp.salary_type==="monthly"
+    ? holHours*rate*1      // 月薪制正職：加給1倍
+    : 0;                   // 時薪制（兼職/工讀）：不加倍
+
+  const wkPay = 0; // 週末正常工資（已含在reg計算）
+
+  // 月休不足加班費
+  const actualRestDays=schedRecs?schedRecs.filter(s=>s&&s.station==="休假").length:0;
+  const missingRestDays=Math.max(0,MONTHLY_REST_DAYS-actualRestDays);
+  const restOTPay=missingRestDays*8*rate*1.34;
+
+  const total=base+ot+holPay+wkPay+restOTPay;
+  return{reg,ot1,ot2,holHours,wkHours,base,ot,holPay,wkPay,actualRestDays,missingRestDays,restOTPay,total};
 }
 
 function ShiftPopup({emp,date,current,onSave,onClose}){
@@ -232,6 +259,7 @@ export default function App(){
   }
 
   function monthRecs(empId){return monthDays.map(d=>clockMap[`${empId}_${d}`]).filter(r=>r&&r.check_in);}
+  function monthSchedRecs(empId){return monthDays.map(d=>schedMap[`${empId}_${d}`]);}
 
   const S={
     card:{background:"#1a2a3a",borderRadius:12,padding:"14px 16px",marginBottom:10,border:"1px solid #2a3a4a"},
@@ -343,6 +371,25 @@ export default function App(){
           </div>
         </div>}
 
+        {/* 排班頁面月休統計 */}
+        {tab==="schedule"&&employees.length>0&&<div style={{marginTop:16,...S.card}}>
+          <div style={{fontWeight:600,fontSize:13,marginBottom:10,color:"#e8e0d0"}}>📊 本月休假統計（應休 {MONTHLY_REST_DAYS} 天）</div>
+          <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
+            {employees.map(emp=>{
+              const schedRecs=monthSchedRecs(emp.id);
+              const restDays=schedRecs.filter(s=>s&&s.station==="休假").length;
+              const missing=Math.max(0,MONTHLY_REST_DAYS-restDays);
+              return(
+                <div key={emp.id} style={{background:"#0f1923",borderRadius:8,padding:"8px 12px",minWidth:120,border:`1px solid ${missing>0?"#f0a50066":"#2a3a4a"}`}}>
+                  <div style={{fontWeight:600,fontSize:13}}>{emp.name}</div>
+                  <div style={{fontSize:12,color:missing>0?"#f0a500":"#4caf50",marginTop:4}}>
+                    已休 {restDays} 天 {missing>0?`⚠️ 少休 ${missing} 天`:"✅"}
+                  </div>
+                </div>);
+            })}
+          </div>
+        </div>}
+
         {/* 薪資（老闆限定）*/}
         {tab==="salary"&&isOwner&&<div>
           <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14}}>
@@ -351,19 +398,35 @@ export default function App(){
             <button onClick={()=>{if(vm===11){setVm(0);setVy(y=>y+1)}else setVm(m=>m+1)}} style={S.nav}>›</button>
           </div>
           <div style={{fontSize:11,color:"#8a9ab0",marginBottom:12}}>勞基法：平日加班前2h ×1.34、第3h起 ×1.67；假日 ×2</div>
-          {employees.map(emp=>{const recs=monthRecs(emp.id);const w=calcWage(emp,recs);return(
+          {employees.map(emp=>{
+            const recs=monthRecs(emp.id);
+            const schedRecs=monthSchedRecs(emp.id);
+            const w=calcWage(emp,recs,schedRecs);
+            return(
             <div key={emp.id} style={S.card}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
                 <div><span style={{fontWeight:700,fontSize:15}}>{emp.name}</span><span style={{color:"#8a9ab0",fontSize:12,marginLeft:8}}>{emp.dept}｜{emp.position}</span></div>
                 <div style={{fontSize:20,fontWeight:700,color:"#f0a500"}}>NT$ {Math.round(w.total).toLocaleString()}</div>
               </div>
               <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,fontSize:12}}>
-                {[{l:emp.salary_type==="monthly"?"底薪":"正班薪資",v:`NT$ ${Math.round(w.base).toLocaleString()}`},{l:`正班 ${w.reg.toFixed(1)}h`,v:""},{l:`加班 ${(w.ot1+w.ot2).toFixed(1)}h`,v:`NT$ ${Math.round(w.ot).toLocaleString()}`},{l:`假日 ${w.hol.toFixed(1)}h`,v:`NT$ ${Math.round(w.hp).toLocaleString()}`},{l:"出勤天數",v:`${recs.length} 天`},{l:"時薪",v:`NT$ ${emp.hourly_rate}`}].map((x,i)=>(
-                  <div key={i} style={{background:"#0f1923",borderRadius:8,padding:"8px 10px"}}>
-                    <div style={{color:"#8a9ab0",fontSize:11}}>{x.l}</div>
-                    {x.v&&<div style={{color:"#e8e0d0",fontWeight:600,marginTop:2}}>{x.v}</div>}
+                {[
+                  {l:emp.salary_type==="monthly"?"底薪":"正班薪資",v:`NT$ ${Math.round(w.base).toLocaleString()}`,warn:false},
+                  {l:`正班 ${w.reg.toFixed(1)}h`,v:"",warn:false},
+                  {l:`平日加班 ${(w.ot1+w.ot2).toFixed(1)}h`,v:`NT$ ${Math.round(w.ot).toLocaleString()}`,warn:false},
+                  {l:`國定假日 ${w.holHours.toFixed(1)}h`,v:emp.salary_type==="monthly"?`NT$ ${Math.round(w.holPay).toLocaleString()} (加給1倍)`:"正常工資（時薪制）",warn:false},
+
+                  {l:"出勤天數",v:`${recs.length} 天`,warn:false},
+                  {l:`實際休假`,v:`${w.actualRestDays} 天（應休 ${MONTHLY_REST_DAYS} 天）`,warn:false},
+                  {l:`少休 ${w.missingRestDays} 天加班`,v:`NT$ ${Math.round(w.restOTPay).toLocaleString()}`,warn:w.missingRestDays>0},
+                ].map((x,i)=>(
+                  <div key={i} style={{background:x.warn?"#2a1a0a":"#0f1923",borderRadius:8,padding:"8px 10px",border:x.warn?"1px solid #f0a50066":"none"}}>
+                    <div style={{color:x.warn?"#f0a500":"#8a9ab0",fontSize:11}}>{x.l}</div>
+                    {x.v&&<div style={{color:x.warn?"#f0a500":"#e8e0d0",fontWeight:600,marginTop:2}}>{x.v}</div>}
                   </div>))}
               </div>
+              {w.missingRestDays>0&&<div style={{marginTop:10,background:"#2a1a0a",borderRadius:8,padding:"8px 12px",fontSize:12,color:"#f0a500",border:"1px solid #f0a50044"}}>
+                ⚠️ {emp.name} 本月少休 {w.missingRestDays} 天，需補加班費 NT$ {Math.round(w.restOTPay).toLocaleString()}
+              </div>}
             </div>);})}
         </div>}
 
