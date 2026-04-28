@@ -150,7 +150,7 @@ export default function App(){
   async function handleClock(empId,action){
     const t=new Date().toTimeString().slice(0,5);const key=`${empId}_${today}`;
     if(demo){setClockMap(prev=>{const r=prev[key]||{employee_id:empId,work_date:today};return{...prev,[key]:action==="in"?{...r,check_in:t}:{...r,check_out:t}};});toast_(action==="in"?"✅ 上班打卡成功":"👋 下班打卡成功");return;}
-    try{const r=clockMap[key]||{};await db.upsert("clock_records",{employee_id:empId,work_date:today,check_in:action==="in"?t:r.check_in,check_out:action==="out"?t:r.check_out});await loadData();toast_(action==="in"?"✅ 上班打卡成功":"👋 下班打卡成功");}
+    try{const r=clockMap[key]||{};const ci=r.check_in?(r.check_in.slice(0,5)):null;await db.upsert("clock_records",{employee_id:empId,work_date:today,check_in:action==="in"?t:ci,check_out:action==="out"?t:(r.check_out?r.check_out.slice(0,5):null)});await loadData();toast_(action==="in"?"✅ 上班打卡成功":"👋 下班打卡成功");}
     catch(e){toast_("打卡失敗","error");}
   }
 
