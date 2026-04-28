@@ -139,7 +139,7 @@ export default function App(){
         db.get("schedules",`?work_date=gte.${mp}-01&work_date=lte.${mp}-${lastDay}`),
       ]);
       setEmployees(emps);
-      const cm={};clocks.forEach(r=>cm[`${r.employee_id}_${r.work_date}`]=r);setClockMap(cm);
+      const cm={};clocks.forEach(r=>cm[`${r.employee_id}_${r.work_date}`]={id:r.id,check_in:r.check_in,check_out:r.check_out,employee_id:r.employee_id,work_date:r.work_date});setClockMap(cm);
       const sm={};scheds.forEach(r=>sm[`${r.employee_id}_${r.work_date}`]={station:r.station||"",start_time:r.start_time||"",end_time:r.end_time||""});setSchedMap(sm);
     }catch(e){toast_("連線失敗："+e.message,"error");}
     setLoading(false);
@@ -150,7 +150,19 @@ export default function App(){
   async function handleClock(empId,action){
     const t=new Date().toTimeString().slice(0,5);const key=`${empId}_${today}`;
     if(demo){setClockMap(prev=>{const r=prev[key]||{employee_id:empId,work_date:today};return{...prev,[key]:action==="in"?{...r,check_in:t}:{...r,check_out:t}};});toast_(action==="in"?"✅ 上班打卡成功":"👋 下班打卡成功");return;}
-    try{const r=clockMap[key]||{};await db.upsert("clock_records",{employee_id:empId,work_date:today,check_in:action==="in"?t:(r.check_in||null),check_out:action==="out"?t:(r.check_out||null)});await loadData();toast_(action==="in"?"✅ 上班打卡成功":"👋 下班打卡成功");}
+    try{
+      const r=clockMap[key]||{};
+      if(action==="in"){
+        await db.insert("clock_records",{employee_id:empId,work_date:today,check_in:t,check_out:null});
+      } else {
+        if(r.id){
+          await fetch(`${SUPABASE_URL}/rest/v1/clock_records?id=eq.${r.id}`,{method:"PATCH",headers:dbH(),body:JSON.stringify({check_out:t})});
+        } else {
+          await db.upsert("clock_records",{employee_id:empId,work_date:today,check_in:r.check_in||t,check_out:t});
+        }
+      }
+      await loadData();toast_(action==="in"?"✅ 上班打卡成功":"👋 下班打卡成功");
+    }
     catch(e){toast_("打卡失敗","error");}
   }
 
