@@ -45,7 +45,6 @@ function calcWage(emp,recs){
   return{reg,ot1,ot2,hol,base,ot,hp,total:base+ot+hp};
 }
 
-// 排班彈窗：選崗位 + 自訂上下班時間
 function ShiftPopup({emp,date,current,onSave,onClose}){
   const[station,setStation]=useState(current?.station||"");
   const[startTime,setStartTime]=useState(current?.start_time||"08:00");
@@ -53,44 +52,39 @@ function ShiftPopup({emp,date,current,onSave,onClose}){
   const isOff=station==="休假";
   return(
     <div style={{position:"fixed",inset:0,background:"#00000099",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={onClose}>
-      <div style={{background:"#1a2a3a",borderRadius:16,padding:24,width:300,border:"1px solid #2a3a4a",boxShadow:"0 20px 60px #000"}} onClick={e=>e.stopPropagation()}>
+      <div style={{background:"#1a2a3a",borderRadius:16,padding:24,width:320,border:"1px solid #2a3a4a",boxShadow:"0 20px 60px #000"}} onClick={e=>e.stopPropagation()}>
         <div style={{fontWeight:700,fontSize:15,marginBottom:2}}>{emp.name}</div>
         <div style={{fontSize:12,color:"#8a9ab0",marginBottom:16}}>{date}</div>
-
         <div style={{marginBottom:14}}>
           <div style={{fontSize:11,color:"#8a9ab0",marginBottom:8}}>崗位</div>
           <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
             {STATIONS.map(s=>(
               <button key={s} onClick={()=>setStation(s)}
-                style={{padding:"6px 10px",borderRadius:8,border:`1px solid ${station===s?(s==="休假"?"#e05b00":"#4caf50"):"#3a4a5a"}`,
+                style={{padding:"7px 12px",borderRadius:8,border:`1px solid ${station===s?(s==="休假"?"#e05b00":"#4caf50"):"#3a4a5a"}`,
                   background:station===s?(s==="休假"?"#e05b0033":"#4caf5033"):"#0f1923",
                   color:station===s?(s==="休假"?"#e05b00":"#4caf50"):"#8a9ab0",
-                  fontSize:12,cursor:"pointer",fontFamily:"inherit"}}>
+                  fontSize:13,cursor:"pointer",fontFamily:"inherit"}}>
                 {s}
               </button>))}
           </div>
         </div>
-
-        {!isOff&&<>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16}}>
-            <div>
-              <div style={{fontSize:11,color:"#8a9ab0",marginBottom:6}}>上班時間</div>
-              <input type="time" value={startTime} onChange={e=>setStartTime(e.target.value)}
-                style={{width:"100%",background:"#0f1923",border:"1px solid #2a3a4a",borderRadius:8,padding:"8px 10px",color:"#e8e0d0",fontSize:13,boxSizing:"border-box",fontFamily:"inherit"}}/>
-            </div>
-            <div>
-              <div style={{fontSize:11,color:"#8a9ab0",marginBottom:6}}>下班時間</div>
-              <input type="time" value={endTime} onChange={e=>setEndTime(e.target.value)}
-                style={{width:"100%",background:"#0f1923",border:"1px solid #2a3a4a",borderRadius:8,padding:"8px 10px",color:"#e8e0d0",fontSize:13,boxSizing:"border-box",fontFamily:"inherit"}}/>
-            </div>
+        {!isOff&&<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16}}>
+          <div>
+            <div style={{fontSize:11,color:"#8a9ab0",marginBottom:6}}>上班時間</div>
+            <input type="time" value={startTime} onChange={e=>setStartTime(e.target.value)}
+              style={{width:"100%",background:"#0f1923",border:"1px solid #2a3a4a",borderRadius:8,padding:"8px 10px",color:"#e8e0d0",fontSize:14,boxSizing:"border-box",fontFamily:"inherit"}}/>
           </div>
-        </>}
-
+          <div>
+            <div style={{fontSize:11,color:"#8a9ab0",marginBottom:6}}>下班時間</div>
+            <input type="time" value={endTime} onChange={e=>setEndTime(e.target.value)}
+              style={{width:"100%",background:"#0f1923",border:"1px solid #2a3a4a",borderRadius:8,padding:"8px 10px",color:"#e8e0d0",fontSize:14,boxSizing:"border-box",fontFamily:"inherit"}}/>
+          </div>
+        </div>}
         <div style={{display:"flex",gap:10}}>
           <button onClick={()=>onSave(station,isOff?"":startTime,isOff?"":endTime)}
-            style={{flex:1,background:"#f0a500",border:"none",color:"white",borderRadius:8,padding:10,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>確認</button>
+            style={{flex:1,background:"#f0a500",border:"none",color:"white",borderRadius:8,padding:11,fontWeight:700,cursor:"pointer",fontFamily:"inherit",fontSize:14}}>確認</button>
           <button onClick={onClose}
-            style={{flex:1,background:"#2a3a4a",border:"none",color:"#e8e0d0",borderRadius:8,padding:10,cursor:"pointer",fontFamily:"inherit"}}>取消</button>
+            style={{flex:1,background:"#2a3a4a",border:"none",color:"#e8e0d0",borderRadius:8,padding:11,cursor:"pointer",fontFamily:"inherit",fontSize:14}}>取消</button>
         </div>
       </div>
     </div>
@@ -165,8 +159,15 @@ export default function App(){
     setSchedMap(prev=>({...prev,[key]:{station,start_time:startTime,end_time:endTime}}));
     setPopup(null);
     if(demo)return;
-    try{await db.upsert("schedules",{employee_id:emp.id,work_date:date,shift_id:station==="休假"?"OFF":"A",station,start_time:startTime,end_time:endTime});}
-    catch(e){toast_("排班儲存失敗","error");}
+    try{
+      await db.upsert("schedules",{
+        employee_id:emp.id,work_date:date,
+        shift_id:station==="休假"?"OFF":null,
+        station:station||null,
+        start_time:startTime||null,
+        end_time:endTime||null
+      });
+    }catch(e){toast_("排班儲存失敗："+e.message,"error");}
   }
 
   async function addEmp(){
@@ -217,7 +218,7 @@ export default function App(){
       </div>
       {loading&&<div style={{textAlign:"center",padding:16,color:"#8a9ab0",fontSize:13}}>⏳ 載入中...</div>}
 
-      <div style={{padding:16,maxWidth:900,margin:"0 auto"}}>
+      <div style={{padding:16,maxWidth:1200,margin:"0 auto"}}>
 
         {/* 打卡 */}
         {tab==="clock"&&<div>
@@ -247,7 +248,7 @@ export default function App(){
               </div>);})}
         </div>}
 
-        {/* 排班 */}
+        {/* 排班 - 格子放大1.5倍 */}
         {tab==="schedule"&&<div>
           <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14}}>
             <button onClick={()=>{if(vm===0){setVm(11);setVy(y=>y-1)}else setVm(m=>m-1)}} style={S.nav}>‹</button>
@@ -255,31 +256,42 @@ export default function App(){
             <button onClick={()=>{if(vm===11){setVm(0);setVy(y=>y+1)}else setVm(m=>m+1)}} style={S.nav}>›</button>
           </div>
           <div style={{fontSize:12,color:"#8a9ab0",marginBottom:12}}>💡 點格子可設定崗位與上下班時間</div>
-          <div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
-            <thead><tr>
-              <th style={{padding:"8px 6px",textAlign:"left",color:"#8a9ab0",borderBottom:"1px solid #2a3a4a",minWidth:70}}>員工</th>
-              {monthDays.map(d=>{const day=parseInt(d.split("-")[2]);const iH=isHol(d)||isWk(d);return<th key={d} style={{padding:"4px 2px",textAlign:"center",color:iH?"#f0a500":"#8a9ab0",borderBottom:"1px solid #2a3a4a",minWidth:44}}>{day}{iH&&<div style={{fontSize:9}}>假</div>}</th>;})}
-            </tr></thead>
-            <tbody>{employees.map(emp=>(<tr key={emp.id}>
-              <td style={{padding:"6px",color:"#e8e0d0",borderBottom:"1px solid #1a2a3a",fontSize:12,whiteSpace:"nowrap"}}>{emp.name}</td>
-              {monthDays.map(d=>{
-                const key=`${emp.id}_${d}`;
-                const sched=schedMap[key];
-                const isOff=sched?.station==="休假";
-                return(
-                  <td key={d} style={{padding:"2px",borderBottom:"1px solid #1a2a3a",textAlign:"center"}}>
-                    <button onClick={()=>setPopup({emp,date:d})}
-                      style={{width:42,height:42,borderRadius:6,border:`1px solid ${isOff?"#e05b0066":sched?.station?"#4caf5066":"#3a4a5a"}`,
-                        background:isOff?"#e05b0022":sched?.station?"#4caf5022":"#2a3a4a",
-                        cursor:"pointer",padding:2,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:1}}>
-                      {isOff?<span style={{color:"#e05b00",fontSize:9}}>休</span>:
-                        sched?.station?<span style={{color:"#4caf50",fontSize:9,fontWeight:700}}>{sched.station.slice(0,2)}</span>:
-                        <span style={{color:"#555",fontSize:9}}>+</span>}
-                      {!isOff&&sched?.start_time&&<span style={{color:"#8a9ab0",fontSize:8}}>{sched.start_time}</span>}
-                    </button>
-                  </td>);})}
-            </tr>))}</tbody>
-          </table></div>
+          <div style={{overflowX:"auto"}}>
+            <table style={{borderCollapse:"collapse",fontSize:12}}>
+              <thead><tr>
+                <th style={{padding:"8px 10px",textAlign:"left",color:"#8a9ab0",borderBottom:"1px solid #2a3a4a",minWidth:80,position:"sticky",left:0,background:"#0f1923",zIndex:1}}>員工</th>
+                {monthDays.map(d=>{
+                  const day=parseInt(d.split("-")[2]);
+                  const iH=isHol(d)||isWk(d);
+                  const isToday=d===today;
+                  return<th key={d} style={{padding:"4px 3px",textAlign:"center",color:isToday?"#fff":iH?"#f0a500":"#8a9ab0",borderBottom:"1px solid #2a3a4a",minWidth:54,background:isToday?"#2a3a4a":"transparent",borderRadius:isToday?4:0}}>
+                    {day}{iH&&<div style={{fontSize:9}}>假</div>}
+                  </th>;})}
+              </tr></thead>
+              <tbody>{employees.map(emp=>(<tr key={emp.id}>
+                <td style={{padding:"6px 10px",color:"#e8e0d0",borderBottom:"1px solid #1a2a3a",fontSize:13,whiteSpace:"nowrap",position:"sticky",left:0,background:"#0f1923",zIndex:1}}>{emp.name}</td>
+                {monthDays.map(d=>{
+                  const key=`${emp.id}_${d}`;
+                  const sched=schedMap[key];
+                  const isOff=sched?.station==="休假";
+                  return(
+                    <td key={d} style={{padding:"3px",borderBottom:"1px solid #1a2a3a",textAlign:"center"}}>
+                      <button onClick={()=>setPopup({emp,date:d})}
+                        style={{width:54,height:54,borderRadius:8,border:`1px solid ${isOff?"#e05b0066":sched?.station?"#4caf5066":"#3a4a5a"}`,
+                          background:isOff?"#e05b0022":sched?.station?"#4caf5022":"#2a3a4a",
+                          cursor:"pointer",padding:3,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:2}}>
+                        {isOff
+                          ?<span style={{color:"#e05b00",fontSize:12,fontWeight:700}}>休</span>
+                          :sched?.station
+                            ?<span style={{color:"#4caf50",fontSize:11,fontWeight:700,lineHeight:1.2,textAlign:"center"}}>{sched.station}</span>
+                            :<span style={{color:"#555",fontSize:16}}>+</span>}
+                        {!isOff&&sched?.start_time&&<span style={{color:"#8a9ab0",fontSize:9,lineHeight:1}}>{sched.start_time}</span>}
+                        {!isOff&&sched?.end_time&&<span style={{color:"#8a9ab0",fontSize:9,lineHeight:1}}>{sched.end_time}</span>}
+                      </button>
+                    </td>);})}
+              </tr>))}</tbody>
+            </table>
+          </div>
         </div>}
 
         {/* 薪資（老闆限定）*/}
