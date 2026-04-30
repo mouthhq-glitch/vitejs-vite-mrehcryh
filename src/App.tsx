@@ -33,54 +33,58 @@ const getDays=(y,m)=>new Date(y,m+1,0).getDate();
 const MONTHLY_REST_DAYS = 8; // 月休天數
 
 function calcWage(emp, recs, schedRecs){
-  let reg=0,ot1=0,ot2=0;
-  let holHours=0; // 國定假日出勤小時
-  let wkHours=0;  // 週休出勤小時
+  let reg=0, ot1=0, ot2=0;
+  let holHours=0; // 國定假日正職出勤小時（8h以內）
+
   recs.forEach(r=>{
     if(!r.check_in||!r.check_out)return;
-    // 確保時間格式正確，支援 HH:MM 和 HH:MM:SS
     const ci=r.check_in.length===5?r.check_in+":00":r.check_in;
     const co=r.check_out.length===5?r.check_out+":00":r.check_out;
     let h=(new Date(`${r.work_date}T${co}`)-new Date(`${r.work_date}T${ci}`))/3600000;
     if(h<0)h+=24;
-    // 以30分鐘為單位，無條件捨去
+    // 滿30分鐘才給半小時（無條件捨去至0.5h單位）
     h=Math.floor(h*2)/2;
     h=Math.max(0,h);
+
     if(isHol(r.work_date)){
-      holHours+=h; // 國定假日
+      if(emp.salary_type==="monthly"){
+        // 正職月薪制：8h內補1倍，超過8h部分×1.34
+        const holReg=Math.min(h,8);
+        const holOt=Math.max(0,h-8);
+        holHours+=holReg;
+        ot1+=holOt; // 超過8h的部分進加班費計算
+      } else {
+        // 兼職/工讀：國定假日算正班工時，不加倍
+        reg+=h;
+      }
     } else {
       if(emp.salary_type==="monthly"){
-        // 月薪制正職：有加班費計算
-        if(h<=8)reg+=h;
-        else if(h<=10){reg+=8;ot1+=h-8;}
-        else{reg+=8;ot1+=2;ot2+=h-10;}
+        // 月薪制正職：平日加班費計算
+        if(h<=8) reg+=h;
+        else if(h<=10){ reg+=8; ot1+=h-8; }
+        else{ reg+=8; ot1+=2; ot2+=h-10; }
       } else {
-        // 時薪制（兼職/工讀）：全部算正常工資
+        // 時薪制（兼職/工讀）：全部算正班，不超過8h無加班
         reg+=h;
       }
     }
   });
 
   const rate=emp.hourly_rate;
+  // 月薪制底薪直接用monthly_rate；時薪制用實際出勤工時×時薪
   const base=emp.salary_type==="monthly"?emp.monthly_rate:reg*rate;
+  // 平日加班費（含國定假日正職超過8h部分）
   const ot=ot1*rate*1.34+ot2*rate*1.67;
-
-  // 國定假日加班費（勞基法）
-  // 正職月薪制：原本就有薪，出勤再加1倍
-  // 兼職/工讀時薪制：國定假日不加倍，正常計算（已含在reg）
-  const holPay = emp.salary_type==="monthly"
-    ? holHours*rate*1      // 月薪制正職：加給1倍
-    : 0;                   // 時薪制（兼職/工讀）：不加倍
-
-  const wkPay = 0; // 週末正常工資（已含在reg計算）
+  // 國定假日加給：正職月薪制補1倍（底薪已含當天，再補1倍）
+  const holPay=emp.salary_type==="monthly"?holHours*rate*1:0;
 
   // 月休不足加班費（只適用正職月薪制）
   const actualRestDays=schedRecs?schedRecs.filter(s=>s&&s.station==="休假").length:0;
   const missingRestDays=emp.salary_type==="monthly"?Math.max(0,MONTHLY_REST_DAYS-actualRestDays):0;
   const restOTPay=missingRestDays*8*rate*1.34;
 
-  const total=base+ot+holPay+wkPay+restOTPay;
-  return{reg,ot1,ot2,holHours,wkHours,base,ot,holPay,wkPay,actualRestDays,missingRestDays,restOTPay,total};
+  const total=base+ot+holPay+restOTPay;
+  return{reg,ot1,ot2,holHours,base,ot,holPay,actualRestDays,missingRestDays,restOTPay,total};
 }
 
 function ShiftPopup({emp,date,current,onSave,onClose}){
@@ -170,7 +174,6 @@ function Login({onLogin}){
           <div style={{width:60,height:60,borderRadius:16,background:"linear-gradient(135deg,#f0a500,#e05b00)",display:"inline-flex",alignItems:"center",justifyContent:"center",fontSize:28,marginBottom:10}}>🏢</div>
           <div style={{fontWeight:700,fontSize:20,color:"#e8e0d0"}}>卯食豐原</div>
         </div>
-
         <div style={{marginBottom:14}}><div style={{fontSize:12,color:"#8a9ab0",marginBottom:6}}>帳號</div><input value={u} onChange={e=>su(e.target.value)} onKeyDown={e=>e.key==="Enter"&&go()} style={inp}/></div>
         <div style={{marginBottom:18}}><div style={{fontSize:12,color:"#8a9ab0",marginBottom:6}}>密碼</div><input type="password" value={p} onChange={e=>sp(e.target.value)} onKeyDown={e=>e.key==="Enter"&&go()} style={inp}/></div>
         {err&&<div style={{color:"#e05b00",fontSize:12,marginBottom:12,textAlign:"center"}}>⚠ {err}</div>}
@@ -229,11 +232,9 @@ export default function App(){
     const t=new Date().toTimeString().slice(0,5);const key=`${empId}_${today}`;
     if(demo){setClockMap(prev=>{const r=prev[key]||{employee_id:empId,work_date:today};return{...prev,[key]:action==="in"?{...r,check_in:t}:{...r,check_out:t}};});toast_(action==="in"?"✅ 上班打卡成功":"👋 下班打卡成功");return;}
     try{
-      const r=clockMap[key]||{};
       if(action==="in"){
         await db.upsert("clock_records",{employee_id:empId,work_date:today,check_in:t,check_out:null});
       } else {
-        // 下班打卡：用 employee_id + work_date 直接 PATCH
         await fetch(`${SUPABASE_URL}/rest/v1/clock_records?employee_id=eq.${empId}&work_date=eq.${today}`,{
           method:"PATCH",headers:dbH(),body:JSON.stringify({check_out:t})
         });
@@ -373,7 +374,7 @@ export default function App(){
               </div>);})}
         </div>}
 
-        {/* 排班 - 格子放大1.5倍 */}
+        {/* 排班 */}
         {tab==="schedule"&&<div>
           <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14}}>
             <button onClick={()=>{if(vm===0){setVm(11);setVy(y=>y-1)}else setVm(m=>m-1)}} style={S.nav}>‹</button>
@@ -450,7 +451,9 @@ export default function App(){
             <span style={{fontWeight:700,fontSize:15}}>{vy}年 {vm+1}月 薪資計算</span>
             <button onClick={()=>{if(vm===11){setVm(0);setVy(y=>y+1)}else setVm(m=>m+1)}} style={S.nav}>›</button>
           </div>
-          <div style={{fontSize:11,color:"#8a9ab0",marginBottom:12}}>勞基法：平日加班前2h ×1.34、第3h起 ×1.67；假日 ×2</div>
+          <div style={{fontSize:11,color:"#8a9ab0",marginBottom:12}}>
+            勞基法：平日加班前2h ×1.34、第3h起 ×1.67｜國定假日正職補1倍，超過8h再×1.34｜兼職/工讀假日正常計薪
+          </div>
           {employees.map(emp=>{
             const recs=monthRecs(emp.id);
             const schedRecs=monthSchedRecs(emp.id);
@@ -465,9 +468,12 @@ export default function App(){
                 {[
                   {l:emp.salary_type==="monthly"?"底薪":"正班薪資",v:`NT$ ${Math.round(w.base).toLocaleString()}`,warn:false},
                   {l:`正班 ${w.reg.toFixed(1)}h`,v:"",warn:false},
-                  {l:`平日加班 ${(w.ot1+w.ot2).toFixed(1)}h`,v:`NT$ ${Math.round(w.ot).toLocaleString()}`,warn:false},
-                  {l:`國定假日 ${w.holHours.toFixed(1)}h`,v:emp.salary_type==="monthly"?`NT$ ${Math.round(w.holPay).toLocaleString()} (加給1倍)`:"正常工資（時薪制）",warn:false},
-
+                  {l:`加班 ${(w.ot1+w.ot2).toFixed(1)}h`,v:`NT$ ${Math.round(w.ot).toLocaleString()}`,warn:false},
+                  {l:emp.salary_type==="monthly"
+                    ?`國定假日 ${w.holHours.toFixed(1)}h（補1倍）`
+                    :`國定假日 — 已含正班`,
+                   v:emp.salary_type==="monthly"?`NT$ ${Math.round(w.holPay).toLocaleString()}`:"",
+                   warn:false},
                   {l:"出勤天數",v:`${recs.length} 天`,warn:false},
                   {l:`實際休假`,v:`${w.actualRestDays} 天（應休 ${MONTHLY_REST_DAYS} 天）`,warn:false},
                   {l:`少休 ${w.missingRestDays} 天加班`,v:`NT$ ${Math.round(w.restOTPay).toLocaleString()}`,warn:w.missingRestDays>0},
@@ -536,7 +542,6 @@ export default function App(){
               </div>
             </div>))}
 
-          {/* 編輯員工彈窗 */}
           {editEmp&&<div style={{position:"fixed",inset:0,background:"#00000099",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={()=>setEditEmp(null)}>
             <div style={{background:"#1a2a3a",borderRadius:16,padding:24,width:"100%",maxWidth:480,border:"1px solid #f0a500",boxShadow:"0 20px 60px #000",maxHeight:"90vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
               <div style={{fontWeight:700,fontSize:16,marginBottom:16}}>✏️ 編輯員工資料</div>
