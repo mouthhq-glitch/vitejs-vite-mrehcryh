@@ -231,13 +231,12 @@ export default function App(){
     try{
       const r=clockMap[key]||{};
       if(action==="in"){
-        await db.insert("clock_records",{employee_id:empId,work_date:today,check_in:t,check_out:null});
+        await db.upsert("clock_records",{employee_id:empId,work_date:today,check_in:t,check_out:null});
       } else {
-        if(r.id){
-          await fetch(`${SUPABASE_URL}/rest/v1/clock_records?id=eq.${r.id}`,{method:"PATCH",headers:dbH(),body:JSON.stringify({check_out:t})});
-        } else {
-          await db.upsert("clock_records",{employee_id:empId,work_date:today,check_in:r.check_in||t,check_out:t});
-        }
+        // 下班打卡：用 employee_id + work_date 直接 PATCH
+        await fetch(`${SUPABASE_URL}/rest/v1/clock_records?employee_id=eq.${empId}&work_date=eq.${today}`,{
+          method:"PATCH",headers:dbH(),body:JSON.stringify({check_out:t})
+        });
       }
       await loadData();toast_(action==="in"?"✅ 上班打卡成功":"👋 下班打卡成功");
     }
