@@ -275,20 +275,17 @@ export default function App(){
   const[popup,setPopup]=useState(null);const[clockFixPopup,setClockFixPopup]=useState(null);
   const[deleteConfirm,setDeleteConfirm]=useState(null);
   const[deletePwd,setDeletePwd]=useState("");const[deleteErr,setDeleteErr]=useState("");
-  const[clockDate,setClockDate]=useState(fmt(new Date()));
+  const[clockDate,setClockDate]=useState("");
   const now=new Date();const[vy,setVy]=useState(now.getFullYear());const[vm,setVm]=useState(now.getMonth());
   const isOwner=user?.role==="owner";const demo=isDemo();
-  const today=fmt(new Date()); // 每次 render 都重新計算今天日期
-  // 每分鐘強制 re-render 以更新 today，並自動推進 clockDate
+  const today=fmt(new Date());
+  const effectiveClockDate=clockDate||today;
+  // 每分鐘強制 re-render 以更新 today
   const[,forceUpdate]=useState(0);
   useEffect(()=>{
     const id=setInterval(()=>forceUpdate(n=>n+1),60000);
     return()=>clearInterval(id);
   },[]);
-  // 若 clockDate 是昨天（跨日了），自動切到今天
-  useEffect(()=>{
-    if(clockDate<today)setClockDate(today);
-  },[today]);
   const monthDays=Array.from({length:getDays(vy,vm)},(_,i)=>`${vy}-${String(vm+1).padStart(2,"0")}-${String(i+1).padStart(2,"0")}`);
   const mp=`${vy}-${String(vm+1).padStart(2,"0")}`;
   function toast_(msg,type="success"){setToast({msg,type});setTimeout(()=>setToast(null),3000);}
@@ -314,9 +311,9 @@ export default function App(){
 
   // 補打卡選到不同月份時，額外載入該日打卡資料
   useEffect(()=>{
-    if(!user||demo)return;
+    if(!user||demo||!clockDate)return;
     const [cy,cm2]=clockDate.split("-").map(Number);
-    if(cy===vy&&cm2===vm+1)return; // 已在當前月份範圍內
+    if(cy===vy&&cm2===vm+1)return;
     (async()=>{
       try{
         const clocks=await db.get("clock_records",`?work_date=eq.${clockDate}`);
@@ -479,22 +476,22 @@ export default function App(){
         {tab==="clock"&&<div>
           {/* 日期選擇器 */}
           <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14,flexWrap:"wrap"}}>
-            <input type="date" value={clockDate} max={today}
+            <input type="date" value={effectiveClockDate} max={today}
               onChange={e=>setClockDate(e.target.value)}
               style={{background:"#1a2a3a",border:"1px solid #2a3a4a",borderRadius:8,padding:"8px 12px",color:"#e8e0d0",fontSize:14,fontFamily:"inherit",cursor:"pointer"}}/>
-            <button onClick={()=>setClockDate(today)}
-              style={{background:clockDate===today?"#f0a50033":"#1a2a3a",border:`1px solid ${clockDate===today?"#f0a500":"#2a3a4a"}`,color:clockDate===today?"#f0a500":"#8a9ab0",borderRadius:8,padding:"8px 12px",fontSize:13,cursor:"pointer",fontFamily:"inherit"}}>
+            <button onClick={()=>setClockDate("")}
+              style={{background:effectiveClockDate===today?"#f0a50033":"#1a2a3a",border:`1px solid ${effectiveClockDate===today?"#f0a500":"#2a3a4a"}`,color:effectiveClockDate===today?"#f0a500":"#8a9ab0",borderRadius:8,padding:"8px 12px",fontSize:13,cursor:"pointer",fontFamily:"inherit"}}>
               今天
             </button>
             <span style={{fontSize:12,color:"#8a9ab0"}}>
-              {isHol(clockDate)?"🎌 國定假日":isWk(clockDate)?"🔵 假日":"⚫ 工作日"}
-              {clockDate!==today&&<span style={{marginLeft:8,color:"#f0a500"}}>📝 補打卡模式</span>}
+              {isHol(effectiveClockDate)?"🎌 國定假日":isWk(effectiveClockDate)?"🔵 假日":"⚫ 工作日"}
+              {effectiveClockDate!==today&&<span style={{marginLeft:8,color:"#f0a500"}}>📝 補打卡模式</span>}
             </span>
           </div>
           {employees.map(emp=>{
-            const rec=clockMap[`${emp.id}_${clockDate}`]||{};
-            const sched=schedMap[`${emp.id}_${clockDate}`];
-            const isPast=clockDate!==today;
+            const rec=clockMap[`${emp.id}_${effectiveClockDate}`]||{};
+            const sched=schedMap[`${emp.id}_${effectiveClockDate}`];
+            const isPast=effectiveClockDate!==today;
             return(
               <div key={emp.id} style={{...S.card,display:"flex",alignItems:"center",gap:12}}>
                 <div style={{width:42,height:42,borderRadius:"50%",background:"linear-gradient(135deg,#2a4a6a,#1a2a3a)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>👤</div>
@@ -517,7 +514,7 @@ export default function App(){
                     <button onClick={()=>handleClock(emp.id,"out")} disabled={!rec.check_in||!!rec.check_out}
                       style={{padding:"8px 12px",borderRadius:8,border:"none",fontFamily:"inherit",background:(!rec.check_in||rec.check_out)?"#2a3a4a":"#f0a500",color:"white",fontSize:12,fontWeight:600,cursor:(!rec.check_in||rec.check_out)?"not-allowed":"pointer"}}>下班打卡</button>
                   </>}
-                  {(!isPast||isOwner)&&<button onClick={()=>setClockFixPopup({emp,date:clockDate})}
+                  {(!isPast||isOwner)&&<button onClick={()=>setClockFixPopup({emp,date:effectiveClockDate})}
                     style={{padding:"8px 12px",borderRadius:8,border:"1px solid #4a6a8a",fontFamily:"inherit",background:"#1a2a3a",color:"#8ab0d0",fontSize:12,fontWeight:600,cursor:"pointer"}}>
                     {isPast?(rec.check_in?"✏️ 修改":"📝 補打卡"):"✏️ 修正"}
                   </button>}
