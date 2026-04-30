@@ -38,8 +38,14 @@ function calcWage(emp, recs, schedRecs){
   let wkHours=0;  // 週休出勤小時
   recs.forEach(r=>{
     if(!r.check_in||!r.check_out)return;
-    let h=(new Date(`${r.work_date}T${r.check_out}`)-new Date(`${r.work_date}T${r.check_in}`))/3600000;
-    if(h<0)h+=24;h=Math.max(0,h);
+    // 確保時間格式正確，支援 HH:MM 和 HH:MM:SS
+    const ci=r.check_in.length===5?r.check_in+":00":r.check_in;
+    const co=r.check_out.length===5?r.check_out+":00":r.check_out;
+    let h=(new Date(`${r.work_date}T${co}`)-new Date(`${r.work_date}T${ci}`))/3600000;
+    if(h<0)h+=24;
+    // 以30分鐘為單位，無條件捨去
+    h=Math.floor(h*2)/2;
+    h=Math.max(0,h);
     if(isHol(r.work_date)){
       holHours+=h; // 國定假日
     } else {
