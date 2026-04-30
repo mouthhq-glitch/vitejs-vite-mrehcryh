@@ -456,7 +456,7 @@ export default function App(){
     {id:"employees",label:"👥 員工",ownerOnly:false},
   ].filter(t=>!t.ownerOnly||isOwner);
 
-  if(!user)return <Login onLogin={a=>{setUser(a);setTab("clock");}}/>;
+  if(!user)return <Login onLogin={a=>{setUser(a);setTab("clock");setClockDate(fmt(new Date()));}}/>;;
 
   return(
     <div style={{minHeight:"100vh",background:"#0f1923",color:"#e8e0d0",fontFamily:"'Noto Sans TC',sans-serif"}}>
