@@ -506,9 +506,9 @@ export default function App(){
                     <button onClick={()=>handleClock(emp.id,"out")} disabled={!rec.check_in||!!rec.check_out}
                       style={{padding:"8px 12px",borderRadius:8,border:"none",fontFamily:"inherit",background:(!rec.check_in||rec.check_out)?"#2a3a4a":"#f0a500",color:"white",fontSize:12,fontWeight:600,cursor:(!rec.check_in||rec.check_out)?"not-allowed":"pointer"}}>下班打卡</button>
                   </>}
-                  {(!isPast||isOwner)&&!(isPast&&rec.check_in)&&<button onClick={()=>setClockFixPopup({emp,date:clockDate})}
+                  {(!isPast||isOwner)&&<button onClick={()=>setClockFixPopup({emp,date:clockDate})}
                     style={{padding:"8px 12px",borderRadius:8,border:"1px solid #4a6a8a",fontFamily:"inherit",background:"#1a2a3a",color:"#8ab0d0",fontSize:12,fontWeight:600,cursor:"pointer"}}>
-                    {isPast?"📝 補打卡":"✏️ 修正"}
+                    {isPast?(rec.check_in?"✏️ 修改":"📝 補打卡"):"✏️ 修正"}
                   </button>}
                 </div>}
               </div>);})}
