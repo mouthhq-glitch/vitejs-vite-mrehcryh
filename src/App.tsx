@@ -275,6 +275,7 @@ export default function App(){
   const[popup,setPopup]=useState(null);const[clockFixPopup,setClockFixPopup]=useState(null);
   const[deleteConfirm,setDeleteConfirm]=useState(null);
   const[deletePwd,setDeletePwd]=useState("");const[deleteErr,setDeleteErr]=useState("");
+  const[clockDate,setClockDate]=useState(fmt(new Date()));
   const now=new Date();const[vy,setVy]=useState(now.getFullYear());const[vm,setVm]=useState(now.getMonth());
   const isOwner=user?.role==="owner";const demo=isDemo();const today=fmt(new Date());
   const monthDays=Array.from({length:getDays(vy,vm)},(_,i)=>`${vy}-${String(vm+1).padStart(2,"0")}-${String(i+1).padStart(2,"0")}`);
@@ -299,6 +300,23 @@ export default function App(){
   }
 
   useEffect(()=>{if(user)loadData();},[user,vy,vm]);
+
+  // 補打卡選到不同月份時，額外載入該日打卡資料
+  useEffect(()=>{
+    if(!user||demo)return;
+    const [cy,cm2]=clockDate.split("-").map(Number);
+    if(cy===vy&&cm2===vm+1)return; // 已在當前月份範圍內
+    (async()=>{
+      try{
+        const clocks=await db.get("clock_records",`?work_date=eq.${clockDate}`);
+        setClockMap(prev=>{
+          const cm={...prev};
+          clocks.forEach(r=>cm[`${r.employee_id}_${r.work_date}`]={id:r.id,check_in:r.check_in,check_out:r.check_out,employee_id:r.employee_id,work_date:r.work_date});
+          return cm;
+        });
+      }catch(e){}
+    })();
+  },[clockDate]);
 
   async function handleClockFix(emp,date,checkIn,checkOut){
     const key=`${emp.id}_${date}`;
@@ -448,13 +466,27 @@ export default function App(){
 
         {/* 打卡 */}
         {tab==="clock"&&<div>
-          <div style={{fontSize:13,color:"#8a9ab0",marginBottom:14}}>今日：{today}　{isHol(today)?"🎌 國定假日":isWk(today)?"🔵 假日":"⚫ 工作日"}</div>
+          {/* 日期選擇器 */}
+          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14,flexWrap:"wrap"}}>
+            <input type="date" value={clockDate} max={today}
+              onChange={e=>setClockDate(e.target.value)}
+              style={{background:"#1a2a3a",border:"1px solid #2a3a4a",borderRadius:8,padding:"8px 12px",color:"#e8e0d0",fontSize:14,fontFamily:"inherit",cursor:"pointer"}}/>
+            <button onClick={()=>setClockDate(today)}
+              style={{background:clockDate===today?"#f0a50033":"#1a2a3a",border:`1px solid ${clockDate===today?"#f0a500":"#2a3a4a"}`,color:clockDate===today?"#f0a500":"#8a9ab0",borderRadius:8,padding:"8px 12px",fontSize:13,cursor:"pointer",fontFamily:"inherit"}}>
+              今天
+            </button>
+            <span style={{fontSize:12,color:"#8a9ab0"}}>
+              {isHol(clockDate)?"🎌 國定假日":isWk(clockDate)?"🔵 假日":"⚫ 工作日"}
+              {clockDate!==today&&<span style={{marginLeft:8,color:"#f0a500"}}>📝 補打卡模式</span>}
+            </span>
+          </div>
           {employees.map(emp=>{
-            const rec=clockMap[`${emp.id}_${today}`]||{};
-            const sched=schedMap[`${emp.id}_${today}`];
+            const rec=clockMap[`${emp.id}_${clockDate}`]||{};
+            const sched=schedMap[`${emp.id}_${clockDate}`];
+            const isPast=clockDate!==today;
             return(
               <div key={emp.id} style={{...S.card,display:"flex",alignItems:"center",gap:12}}>
-                <div style={{width:42,height:42,borderRadius:"50%",background:"linear-gradient(135deg,#2a4a6a,#1a2a3a)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18}}>👤</div>
+                <div style={{width:42,height:42,borderRadius:"50%",background:"linear-gradient(135deg,#2a4a6a,#1a2a3a)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>👤</div>
                 <div style={{flex:1}}>
                   <div style={{fontWeight:600,fontSize:15}}>{emp.name}</div>
                   <div style={{fontSize:12,color:"#8a9ab0",display:"flex",gap:8,flexWrap:"wrap"}}>
@@ -463,14 +495,21 @@ export default function App(){
                     {sched?.start_time&&<span>⏰{sched.start_time}～{sched.end_time}</span>}
                   </div>
                   <div style={{fontSize:12,marginTop:4,display:"flex",gap:14}}>
-                    <span style={{color:rec.check_in?"#4caf50":"#555"}}>上班：{rec.check_in||"--:--"}</span>
-                    <span style={{color:rec.check_out?"#f0a500":"#555"}}>下班：{rec.check_out||"--:--"}</span>
+                    <span style={{color:rec.check_in?"#4caf50":"#555"}}>上班：{rec.check_in?.slice(0,5)||"--:--"}</span>
+                    <span style={{color:rec.check_out?"#f0a500":"#555"}}>下班：{rec.check_out?.slice(0,5)||"--:--"}</span>
                   </div>
                 </div>
                 {sched?.station!=="休假"&&<div style={{display:"flex",gap:8,flexWrap:"wrap",justifyContent:"flex-end"}}>
-                  <button onClick={()=>handleClock(emp.id,"in")} disabled={!!rec.check_in} style={{padding:"8px 12px",borderRadius:8,border:"none",fontFamily:"inherit",background:rec.check_in?"#2a3a4a":"#4caf50",color:"white",fontSize:12,fontWeight:600,cursor:rec.check_in?"not-allowed":"pointer"}}>上班打卡</button>
-                  <button onClick={()=>handleClock(emp.id,"out")} disabled={!rec.check_in||!!rec.check_out} style={{padding:"8px 12px",borderRadius:8,border:"none",fontFamily:"inherit",background:(!rec.check_in||rec.check_out)?"#2a3a4a":"#f0a500",color:"white",fontSize:12,fontWeight:600,cursor:(!rec.check_in||rec.check_out)?"not-allowed":"pointer"}}>下班打卡</button>
-                  <button onClick={()=>setClockFixPopup({emp,date:today})} style={{padding:"8px 12px",borderRadius:8,border:"1px solid #4a6a8a",fontFamily:"inherit",background:"#1a2a3a",color:"#8ab0d0",fontSize:12,fontWeight:600,cursor:"pointer"}}>✏️ 修正</button>
+                  {!isPast&&<>
+                    <button onClick={()=>handleClock(emp.id,"in")} disabled={!!rec.check_in}
+                      style={{padding:"8px 12px",borderRadius:8,border:"none",fontFamily:"inherit",background:rec.check_in?"#2a3a4a":"#4caf50",color:"white",fontSize:12,fontWeight:600,cursor:rec.check_in?"not-allowed":"pointer"}}>上班打卡</button>
+                    <button onClick={()=>handleClock(emp.id,"out")} disabled={!rec.check_in||!!rec.check_out}
+                      style={{padding:"8px 12px",borderRadius:8,border:"none",fontFamily:"inherit",background:(!rec.check_in||rec.check_out)?"#2a3a4a":"#f0a500",color:"white",fontSize:12,fontWeight:600,cursor:(!rec.check_in||rec.check_out)?"not-allowed":"pointer"}}>下班打卡</button>
+                  </>}
+                  {(!isPast||isOwner)&&<button onClick={()=>setClockFixPopup({emp,date:clockDate})}
+                    style={{padding:"8px 12px",borderRadius:8,border:"1px solid #4a6a8a",fontFamily:"inherit",background:"#1a2a3a",color:"#8ab0d0",fontSize:12,fontWeight:600,cursor:"pointer"}}>
+                    {isPast?"📝 補打卡":"✏️ 修正"}
+                  </button>}
                 </div>}
               </div>);})}
         </div>}
