@@ -276,20 +276,19 @@ export default function App(){
   const[deleteConfirm,setDeleteConfirm]=useState(null);
   const[deletePwd,setDeletePwd]=useState("");const[deleteErr,setDeleteErr]=useState("");
   const[clockDate,setClockDate]=useState(fmt(new Date()));
-  const[today,setToday]=useState(fmt(new Date()));
   const now=new Date();const[vy,setVy]=useState(now.getFullYear());const[vm,setVm]=useState(now.getMonth());
   const isOwner=user?.role==="owner";const demo=isDemo();
-  // 每分鐘檢查日期是否跨日
+  const today=fmt(new Date()); // 每次 render 都重新計算今天日期
+  // 每分鐘強制 re-render 以更新 today，並自動推進 clockDate
+  const[,forceUpdate]=useState(0);
   useEffect(()=>{
-    const id=setInterval(()=>{
-      const t=fmt(new Date());
-      setToday(prev=>{
-        if(t!==prev){setClockDate(t);return t;}
-        return prev;
-      });
-    },60000);
+    const id=setInterval(()=>forceUpdate(n=>n+1),60000);
     return()=>clearInterval(id);
   },[]);
+  // 若 clockDate 是昨天（跨日了），自動切到今天
+  useEffect(()=>{
+    if(clockDate<today)setClockDate(today);
+  },[today]);
   const monthDays=Array.from({length:getDays(vy,vm)},(_,i)=>`${vy}-${String(vm+1).padStart(2,"0")}-${String(i+1).padStart(2,"0")}`);
   const mp=`${vy}-${String(vm+1).padStart(2,"0")}`;
   function toast_(msg,type="success"){setToast({msg,type});setTimeout(()=>setToast(null),3000);}
