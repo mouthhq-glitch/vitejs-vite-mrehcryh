@@ -14,7 +14,7 @@ const db={
 };
 
 const TW_HOLIDAYS=["2025-01-01","2025-01-27","2025-01-28","2025-01-29","2025-01-30","2025-01-31","2025-02-28","2025-04-03","2025-04-04","2025-04-05","2025-05-01","2025-05-31","2025-06-06","2025-09-28","2025-10-10","2026-01-01","2026-02-16","2026-02-17","2026-02-18","2026-02-19","2026-02-20","2026-02-28","2026-04-04","2026-04-05","2026-05-01","2026-06-19","2026-09-28","2026-10-10"];
-const ACCOUNTS=[{username:"boss",password:"25721828",role:"owner",label:"👑 老闆"},{username:"mouth",password:"88888888",role:"manager",label:"👔 店長"}];
+const ACCOUNTS=[{username:"boss",password:"25721828",role:"owner",label:"👑 老闆"},{username:"mouth",password:"88888888",role:"manager",label:"👔 店長"},{username:"mouthgood",password:"12345678",role:"staff",label:"👤 打卡"}];
 const DEPARTMENTS=["門市","廚房","外場","行政"];
 const POSITIONS=["正職","兼職","工讀"];
 const STATIONS=["製作1","製作2","煎台","麵線","烤土司","櫃檯","飲料","包裝","外場","備料","休假"];
@@ -282,7 +282,7 @@ export default function App(){
   const[deletePwd,setDeletePwd]=useState("");const[deleteErr,setDeleteErr]=useState("");
   const[clockDate,setClockDate]=useState("");
   const now=new Date();const[vy,setVy]=useState(now.getFullYear());const[vm,setVm]=useState(now.getMonth());
-  const isOwner=user?.role==="owner";const demo=isDemo();
+  const isOwner=user?.role==="owner";const isStaff=user?.role==="staff";const demo=isDemo();
   const today=fmt(new Date());
   const effectiveClockDate=clockDate||today;
   // 每分鐘強制 re-render 以更新 today
@@ -452,11 +452,11 @@ export default function App(){
   };
 
   const TABS=[
-    {id:"clock",label:"⏰ 打卡",ownerOnly:false},
-    {id:"schedule",label:"📅 排班",ownerOnly:false},
-    {id:"salary",label:"💰 薪資",ownerOnly:true},
-    {id:"employees",label:"👥 員工",ownerOnly:false},
-  ].filter(t=>!t.ownerOnly||isOwner);
+    {id:"clock",label:"⏰ 打卡",ownerOnly:false,staffOnly:true},
+    {id:"schedule",label:"📅 排班",ownerOnly:false,staffOnly:false},
+    {id:"salary",label:"💰 薪資",ownerOnly:true,staffOnly:false},
+    {id:"employees",label:"👥 員工",ownerOnly:false,staffOnly:false},
+  ].filter(t=>!t.ownerOnly||isOwner).filter(t=>!isStaff||t.staffOnly);
 
   if(!user)return <Login onLogin={a=>{setUser(a);setTab("clock");setClockDate(fmt(new Date()));}}/>;;
 
@@ -469,7 +469,8 @@ export default function App(){
         <div style={{background:isOwner?"#3a2a0a":"#1a2a3a",border:`1px solid ${isOwner?"#f0a500":"#4a6a8a"}`,borderRadius:20,padding:"4px 12px",fontSize:12,color:isOwner?"#f0a500":"#8ab0d0",fontWeight:600}}>{user.label}</div>
         <button onClick={()=>setUser(null)} style={{background:"#2a1a1a",border:"1px solid #4a2a2a",color:"#e05b00",borderRadius:8,padding:"6px 10px",fontSize:12,cursor:"pointer",fontFamily:"inherit"}}>登出</button>
       </div>
-      {!isOwner&&<div style={{background:"#1a2a0a",borderBottom:"1px solid #3a4a2a",padding:"8px 16px",fontSize:12,color:"#8ab060"}}>🔒 店長模式：可操作打卡、排班、新增員工，薪資僅老闆可查看</div>}
+      {!isOwner&&!isStaff&&<div style={{background:"#1a2a0a",borderBottom:"1px solid #3a4a2a",padding:"8px 16px",fontSize:12,color:"#8ab060"}}>🔒 店長模式：可操作打卡、排班、新增員工，薪資僅老闆可查看</div>}
+      {isStaff&&<div style={{background:"#1a1a2a",borderBottom:"1px solid #2a2a4a",padding:"8px 16px",fontSize:12,color:"#8a9ab0"}}>👤 打卡模式：僅限上下班打卡</div>}
       <div style={{display:"flex",background:"#151f2b",borderBottom:"1px solid #2a3a4a"}}>
         {TABS.map(t=>(<button key={t.id} onClick={()=>setTab(t.id)} style={{flex:1,padding:"12px 4px",border:"none",background:"none",color:tab===t.id?"#f0a500":"#8a9ab0",borderBottom:tab===t.id?"2px solid #f0a500":"2px solid transparent",fontSize:13,fontWeight:tab===t.id?700:400,cursor:"pointer",fontFamily:"inherit"}}>{t.label}</button>))}
       </div>
@@ -519,7 +520,7 @@ export default function App(){
                     <button onClick={()=>handleClock(emp.id,"out")} disabled={!rec.check_in||!!rec.check_out}
                       style={{padding:"8px 12px",borderRadius:8,border:"none",fontFamily:"inherit",background:(!rec.check_in||rec.check_out)?"#2a3a4a":"#f0a500",color:"white",fontSize:12,fontWeight:600,cursor:(!rec.check_in||rec.check_out)?"not-allowed":"pointer"}}>下班打卡</button>
                   </>}
-                  {(!isPast||isOwner)&&<button onClick={()=>setClockFixPopup({emp,date:effectiveClockDate})}
+                  {(!isPast||isOwner)&&!isStaff&&<button onClick={()=>setClockFixPopup({emp,date:effectiveClockDate})}
                     style={{padding:"8px 12px",borderRadius:8,border:"1px solid #4a6a8a",fontFamily:"inherit",background:"#1a2a3a",color:"#8ab0d0",fontSize:12,fontWeight:600,cursor:"pointer"}}>
                     {isPast?(rec.check_in?"✏️ 修改":"📝 補打卡"):"✏️ 修正"}
                   </button>}
