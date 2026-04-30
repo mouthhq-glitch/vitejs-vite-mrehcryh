@@ -27,7 +27,12 @@ const DEMO_EMP=[
 ];
 const isHol=d=>TW_HOLIDAYS.includes(d);
 const isWk=d=>{const w=new Date(d).getDay();return w===0||w===6;};
-const fmt=d=>d.toISOString().split("T")[0];
+const fmt=d=>{
+  const y=d.getFullYear();
+  const m=String(d.getMonth()+1).padStart(2,"0");
+  const day=String(d.getDate()).padStart(2,"0");
+  return `${y}-${m}-${day}`;
+};
 const getDays=(y,m)=>new Date(y,m+1,0).getDate();
 
 const MONTHLY_REST_DAYS = 8; // 月休天數
