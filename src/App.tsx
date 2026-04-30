@@ -275,7 +275,6 @@ export default function App(){
   const[popup,setPopup]=useState(null);const[clockFixPopup,setClockFixPopup]=useState(null);
   const[deleteConfirm,setDeleteConfirm]=useState(null);
   const[deletePwd,setDeletePwd]=useState("");const[deleteErr,setDeleteErr]=useState("");
-  const[dragIdx,setDragIdx]=useState(null);const[dragOverIdx,setDragOverIdx]=useState(null);
   const now=new Date();const[vy,setVy]=useState(now.getFullYear());const[vm,setVm]=useState(now.getMonth());
   const isOwner=user?.role==="owner";const demo=isDemo();const today=fmt(new Date());
   const monthDays=Array.from({length:getDays(vy,vm)},(_,i)=>`${vy}-${String(vm+1).padStart(2,"0")}-${String(i+1).padStart(2,"0")}`);
@@ -403,17 +402,13 @@ export default function App(){
     delEmp(deleteConfirm.id);
   }
 
-  function handleDragStart(i){setDragIdx(i);}
-  function handleDragOver(e,i){e.preventDefault();setDragOverIdx(i);}
-  function handleDrop(i){
-    if(dragIdx===null||dragIdx===i)return;
+  function moveEmp(i,dir){
     const next=[...employees];
-    const [moved]=next.splice(dragIdx,1);
-    next.splice(i,0,moved);
+    const to=i+dir;
+    if(to<0||to>=next.length)return;
+    [next[i],next[to]]=[next[to],next[i]];
     setEmployees(next);
-    setDragIdx(null);setDragOverIdx(null);
   }
-  function handleDragEnd(){setDragIdx(null);setDragOverIdx(null);}
 
   function monthRecs(empId){return monthDays.map(d=>clockMap[`${empId}_${d}`]).filter(r=>r&&r.check_in);}
   function monthSchedRecs(empId){return monthDays.map(d=>schedMap[`${empId}_${d}`]);}
@@ -602,15 +597,14 @@ export default function App(){
             </div>
           </div>}
           {employees.map((emp,i)=>(
-            <div key={emp.id}
-              draggable
-              onDragStart={()=>handleDragStart(i)}
-              onDragOver={e=>handleDragOver(e,i)}
-              onDrop={()=>handleDrop(i)}
-              onDragEnd={handleDragEnd}
-              style={{...S.card,opacity:dragIdx===i?0.4:1,border:dragOverIdx===i&&dragIdx!==i?"1px solid #f0a500":"1px solid #2a3a4a",transition:"border-color 0.15s"}}>
+            <div key={emp.id} style={{...S.card}}>
               <div style={{display:"flex",alignItems:"center",gap:12}}>
-                <div style={{cursor:"grab",color:"#3a4a5a",fontSize:18,padding:"0 4px",userSelect:"none"}} title="拖曳排序">⠿</div>
+                <div style={{display:"flex",flexDirection:"column",gap:4}}>
+                  <button onClick={()=>moveEmp(i,-1)} disabled={i===0}
+                    style={{width:28,height:28,borderRadius:6,border:"1px solid #2a3a4a",background:"#0f1923",color:i===0?"#2a3a4a":"#8a9ab0",fontSize:14,cursor:i===0?"not-allowed":"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center"}}>▲</button>
+                  <button onClick={()=>moveEmp(i,1)} disabled={i===employees.length-1}
+                    style={{width:28,height:28,borderRadius:6,border:"1px solid #2a3a4a",background:"#0f1923",color:i===employees.length-1?"#2a3a4a":"#8a9ab0",fontSize:14,cursor:i===employees.length-1?"not-allowed":"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center"}}>▼</button>
+                </div>
                 <div style={{width:44,height:44,borderRadius:"50%",background:"linear-gradient(135deg,#2a4a6a,#1a2a3a)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>👤</div>
                 <div style={{flex:1}}>
                   <div style={{fontWeight:700,fontSize:15}}>{emp.name}</div>
