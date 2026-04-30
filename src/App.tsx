@@ -276,8 +276,20 @@ export default function App(){
   const[deleteConfirm,setDeleteConfirm]=useState(null);
   const[deletePwd,setDeletePwd]=useState("");const[deleteErr,setDeleteErr]=useState("");
   const[clockDate,setClockDate]=useState(fmt(new Date()));
+  const[today,setToday]=useState(fmt(new Date()));
   const now=new Date();const[vy,setVy]=useState(now.getFullYear());const[vm,setVm]=useState(now.getMonth());
-  const isOwner=user?.role==="owner";const demo=isDemo();const today=fmt(new Date());
+  const isOwner=user?.role==="owner";const demo=isDemo();
+  // 每分鐘檢查日期是否跨日
+  useEffect(()=>{
+    const id=setInterval(()=>{
+      const t=fmt(new Date());
+      setToday(prev=>{
+        if(t!==prev){setClockDate(t);return t;}
+        return prev;
+      });
+    },60000);
+    return()=>clearInterval(id);
+  },[]);
   const monthDays=Array.from({length:getDays(vy,vm)},(_,i)=>`${vy}-${String(vm+1).padStart(2,"0")}-${String(i+1).padStart(2,"0")}`);
   const mp=`${vy}-${String(vm+1).padStart(2,"0")}`;
   function toast_(msg,type="success"){setToast({msg,type});setTimeout(()=>setToast(null),3000);}
