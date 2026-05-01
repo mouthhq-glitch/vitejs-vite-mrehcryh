@@ -280,6 +280,7 @@ export default function App(){
   const[popup,setPopup]=useState(null);const[clockFixPopup,setClockFixPopup]=useState(null);
   const[deleteConfirm,setDeleteConfirm]=useState(null);
   const[deletePwd,setDeletePwd]=useState("");const[deleteErr,setDeleteErr]=useState("");
+  const[clockConfirm,setClockConfirm]=useState(null); // {empId, action}
   const[clockDate,setClockDate]=useState("");
   const now=new Date();const[vy,setVy]=useState(now.getFullYear());const[vm,setVm]=useState(now.getMonth());
   const isOwner=user?.role==="owner";const isStaff=user?.role==="staff";const demo=isDemo();
@@ -528,9 +529,9 @@ export default function App(){
                 </div>
                 {sched?.station!=="休假"&&<div style={{display:"flex",gap:8,flexWrap:"wrap",justifyContent:"flex-end"}}>
                   {!isPast&&<>
-                    <button onClick={()=>handleClock(emp.id,"in")} disabled={!!rec.check_in}
+                    <button onClick={()=>setClockConfirm({empId:emp.id,action:"in",name:emp.name})} disabled={!!rec.check_in}
                       style={{padding:"8px 12px",borderRadius:8,border:"none",fontFamily:"inherit",background:rec.check_in?"#2a3a4a":"#4caf50",color:"white",fontSize:12,fontWeight:600,cursor:rec.check_in?"not-allowed":"pointer"}}>上班打卡</button>
-                    <button onClick={()=>handleClock(emp.id,"out")} disabled={!rec.check_in||!!rec.check_out}
+                    <button onClick={()=>setClockConfirm({empId:emp.id,action:"out",name:emp.name})} disabled={!rec.check_in||!!rec.check_out}
                       style={{padding:"8px 12px",borderRadius:8,border:"none",fontFamily:"inherit",background:(!rec.check_in||rec.check_out)?"#2a3a4a":"#f0a500",color:"white",fontSize:12,fontWeight:600,cursor:(!rec.check_in||rec.check_out)?"not-allowed":"pointer"}}>下班打卡</button>
                   </>}
                   {(!isPast||isOwner)&&!isStaff&&<button onClick={()=>setClockFixPopup({emp,date:effectiveClockDate})}
@@ -743,6 +744,27 @@ export default function App(){
         </div>}
 
       </div>
+
+      {clockConfirm&&<div style={{position:"fixed",inset:0,background:"#00000099",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={()=>setClockConfirm(null)}>
+        <div style={{background:"#1a2a3a",borderRadius:16,padding:24,width:"100%",maxWidth:300,border:`1px solid ${clockConfirm.action==="in"?"#4caf50":"#f0a500"}`,boxShadow:"0 20px 60px #000"}} onClick={e=>e.stopPropagation()}>
+          <div style={{fontWeight:700,fontSize:16,marginBottom:6,color:clockConfirm.action==="in"?"#4caf50":"#f0a500"}}>
+            {clockConfirm.action==="in"?"🟢 上班打卡確認":"🟡 下班打卡確認"}
+          </div>
+          <div style={{fontSize:13,color:"#8a9ab0",marginBottom:20}}>
+            確定要為 <span style={{color:"#e8e0d0",fontWeight:600}}>{clockConfirm.name}</span> 進行{clockConfirm.action==="in"?"上班":"下班"}打卡嗎？
+          </div>
+          <div style={{display:"flex",gap:10}}>
+            <button onClick={()=>{handleClock(clockConfirm.empId,clockConfirm.action);setClockConfirm(null);}}
+              style={{flex:1,background:clockConfirm.action==="in"?"#4caf50":"#f0a500",border:"none",color:"white",borderRadius:8,padding:11,fontWeight:700,cursor:"pointer",fontFamily:"inherit",fontSize:14}}>
+              確定
+            </button>
+            <button onClick={()=>setClockConfirm(null)}
+              style={{flex:1,background:"#2a3a4a",border:"none",color:"#e8e0d0",borderRadius:8,padding:11,cursor:"pointer",fontFamily:"inherit",fontSize:14}}>
+              取消
+            </button>
+          </div>
+        </div>
+      </div>}
 
       {clockFixPopup&&<ClockFixPopup
         emp={clockFixPopup.emp}
