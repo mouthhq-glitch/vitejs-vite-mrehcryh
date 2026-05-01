@@ -301,7 +301,7 @@ export default function App(){
     try{
       const lastDay=String(getDays(vy,vm)).padStart(2,"0");
       const[emps,clocks,scheds]=await Promise.all([
-        db.get("employees","?order=id"),
+        db.get("employees","?order=sort_order"),
         db.get("clock_records",`?work_date=gte.${mp}-01&work_date=lte.${mp}-${lastDay}`),
         db.get("schedules",`?work_date=gte.${mp}-01&work_date=lte.${mp}-${lastDay}`),
       ]);
@@ -437,12 +437,21 @@ export default function App(){
     delEmp(deleteConfirm.id);
   }
 
-  function moveEmp(i,dir){
+  async function moveEmp(i,dir){
     const next=[...employees];
     const to=i+dir;
     if(to<0||to>=next.length)return;
     [next[i],next[to]]=[next[to],next[i]];
     setEmployees(next);
+    if(demo)return;
+    // 儲存新順序到資料庫
+    try{
+      await Promise.all(next.map((emp,idx)=>
+        fetch(`${SUPABASE_URL}/rest/v1/employees?id=eq.${emp.id}`,{
+          method:"PATCH",headers:dbH(),body:JSON.stringify({sort_order:idx+1})
+        })
+      ));
+    }catch(e){toast_("排序儲存失敗","error");}
   }
 
   function monthRecs(empId){return monthDays.map(d=>clockMap[`${empId}_${d}`]).filter(r=>r&&r.check_in);}
