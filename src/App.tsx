@@ -367,12 +367,16 @@ export default function App(){
     setPopup(null);
     if(demo)return;
     try{
-      await db.upsert("schedules",{
-        employee_id:emp.id,work_date:date,
-        shift_id:station==="休假"?"OFF":null,
-        station:station||null,
-        start_time:startTime||null,
-        end_time:endTime||null
+      await fetch(`${SUPABASE_URL}/rest/v1/schedules?on_conflict=employee_id,work_date`,{
+        method:"POST",
+        headers:{...dbH(),"Prefer":"resolution=merge-duplicates,return=representation"},
+        body:JSON.stringify({
+          employee_id:emp.id,work_date:date,
+          shift_id:station==="休假"?"OFF":null,
+          station:station||null,
+          start_time:startTime||null,
+          end_time:endTime||null
+        })
       });
     }catch(e){toast_("排班儲存失敗："+e.message,"error");}
   }
