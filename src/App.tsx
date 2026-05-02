@@ -88,8 +88,8 @@ function calcWage(emp, recs, schedRecs){
   const missingRestDays=emp.salary_type==="monthly"?Math.max(0,MONTHLY_REST_DAYS-actualRestDays):0;
   const restOTPay=missingRestDays*8*rate*1.34;
 
-  const total=base+ot+holPay+restOTPay;
-  return{reg,ot1,ot2,holHours,base,ot,holPay,actualRestDays,missingRestDays,restOTPay,total};
+  const total=base+ot+holPay+restOTPay+(emp.bonus||0);
+  return{reg,ot1,ot2,holHours,base,ot,holPay,actualRestDays,missingRestDays,restOTPay,bonus:emp.bonus||0,total};
 }
 
 function SalaryEmpCard({emp,recs,schedRecs,w,S}){
@@ -119,6 +119,7 @@ function SalaryEmpCard({emp,recs,schedRecs,w,S}){
           {l:"出勤天數",v:`${recs.length} 天`,warn:false},
           {l:"實際休假",v:`${w.actualRestDays} 天（應休 ${MONTHLY_REST_DAYS} 天）`,warn:false},
           {l:`少休 ${w.missingRestDays} 天加班`,v:`NT$ ${Math.round(w.restOTPay).toLocaleString()}`,warn:w.missingRestDays>0},
+          {l:"每月獎金",v:`NT$ ${Math.round(w.bonus).toLocaleString()}`,warn:false},
         ].map((x,i)=>(
           <div key={i} style={{background:x.warn?"#2a1a0a":"#0f1923",borderRadius:8,padding:"8px 10px",border:x.warn?"1px solid #f0a50066":"none"}}>
             <div style={{color:x.warn?"#f0a500":"#8a9ab0",fontSize:11}}>{x.l}</div>
@@ -420,7 +421,7 @@ export default function App(){
     if(demo){setEmployees(p=>p.map(e=>e.id===editEmp.id?{...editEmp,hourly_rate:+editEmp.hourly_rate,monthly_rate:+editEmp.monthly_rate}:e));setEditEmp(null);toast_("✅ 員工資料已更新");return;}
     try{
       const data={name:editEmp.name,dept:editEmp.dept,position:editEmp.position,phone:editEmp.phone||null,id_number:editEmp.id_number||null,birthday:editEmp.birthday||null,join_date:editEmp.join_date||null,note:editEmp.note||null};
-      if(isOwner){data.hourly_rate=+editEmp.hourly_rate;data.monthly_rate=+editEmp.monthly_rate;data.salary_type=editEmp.salary_type;}
+      if(isOwner){data.hourly_rate=+editEmp.hourly_rate;data.monthly_rate=+editEmp.monthly_rate;data.salary_type=editEmp.salary_type;data.bonus=+editEmp.bonus||0;}
       await fetch(`${SUPABASE_URL}/rest/v1/employees?id=eq.${editEmp.id}`,{method:"PATCH",headers:dbH(),body:JSON.stringify(data)});
       await loadData();setEditEmp(null);toast_("✅ 員工資料已更新");
     }catch(e){toast_("更新失敗："+e.message,"error");}
@@ -651,12 +652,13 @@ export default function App(){
               {isOwner&&<>
                 <div><div style={{fontSize:11,color:"#8a9ab0",marginBottom:4}}>時薪(元)</div><input type="number" value={newEmp.hourly_rate} onChange={e=>setNewEmp(p=>({...p,hourly_rate:e.target.value}))} style={S.inp}/></div>
                 <div><div style={{fontSize:11,color:"#8a9ab0",marginBottom:4}}>月薪(元)</div><input type="number" value={newEmp.monthly_rate} onChange={e=>setNewEmp(p=>({...p,monthly_rate:e.target.value}))} style={S.inp}/></div>
+                <div><div style={{fontSize:11,color:"#8a9ab0",marginBottom:4}}>每月獎金(元)</div><input type="number" value={newEmp.bonus||0} onChange={e=>setNewEmp(p=>({...p,bonus:e.target.value}))} style={S.inp}/></div>
                 <div><div style={{fontSize:11,color:"#8a9ab0",marginBottom:4}}>薪資類型</div>
                   <select value={newEmp.salary_type} onChange={e=>setNewEmp(p=>({...p,salary_type:e.target.value}))} style={S.sel}>
                     <option value="monthly">月薪制</option><option value="hourly">時薪制</option>
                   </select>
                 </div>
-              </>}
+              </>;}
             </div>
             <div style={{display:"flex",gap:10,marginTop:12}}>
               <button onClick={addEmp} style={{flex:1,background:"#f0a500",border:"none",color:"white",borderRadius:8,padding:10,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>確認新增</button>
@@ -708,6 +710,7 @@ export default function App(){
                 {isOwner&&<>
                   <div><div style={{fontSize:11,color:"#8a9ab0",marginBottom:4}}>時薪(元)</div><input type="number" value={editEmp.hourly_rate||185} onChange={e=>setEditEmp(p=>({...p,hourly_rate:e.target.value}))} style={S.inp}/></div>
                   <div><div style={{fontSize:11,color:"#8a9ab0",marginBottom:4}}>月薪(元)</div><input type="number" value={editEmp.monthly_rate||0} onChange={e=>setEditEmp(p=>({...p,monthly_rate:e.target.value}))} style={S.inp}/></div>
+                  <div><div style={{fontSize:11,color:"#8a9ab0",marginBottom:4}}>每月獎金(元)</div><input type="number" value={editEmp.bonus||0} onChange={e=>setEditEmp(p=>({...p,bonus:e.target.value}))} style={S.inp}/></div>
                   <div><div style={{fontSize:11,color:"#8a9ab0",marginBottom:4}}>薪資類型</div>
                     <select value={editEmp.salary_type||"hourly"} onChange={e=>setEditEmp(p=>({...p,salary_type:e.target.value}))} style={S.sel}>
                       <option value="monthly">月薪制</option><option value="hourly">時薪制</option>
