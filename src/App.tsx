@@ -658,8 +658,7 @@ export default function App(){
                     <option value="monthly">月薪制</option><option value="hourly">時薪制</option>
                   </select>
                 </div>
-              </>;}
-            </div>
+              </>}            </div>
             <div style={{display:"flex",gap:10,marginTop:12}}>
               <button onClick={addEmp} style={{flex:1,background:"#f0a500",border:"none",color:"white",borderRadius:8,padding:10,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>確認新增</button>
               <button onClick={()=>setShowAdd(false)} style={{flex:1,background:"#2a3a4a",border:"none",color:"#e8e0d0",borderRadius:8,padding:10,cursor:"pointer",fontFamily:"inherit"}}>取消</button>
