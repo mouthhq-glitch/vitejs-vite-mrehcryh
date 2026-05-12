@@ -154,8 +154,8 @@ function SalaryEmpCard({emp,recs,schedRecs,w,S}){
               return(
                 <tr key={i} style={{background:hol?"#1e1a2e":wk?"#1a1e2a":"transparent",borderBottom:"1px solid #1a2a3a"}}>
                   <td style={{padding:"6px 10px",color:"#e8e0d0",whiteSpace:"nowrap"}}>{r.work_date}</td>
-                  <td style={{padding:"6px 10px",color:"#4caf50"}}>{r.check_in.slice(0,5)}</td>
-                  <td style={{padding:"6px 10px",color:"#f0a500"}}>{r.check_out.slice(0,5)}</td>
+                  <td style={{padding:"6px 10px",color:"#4caf50"}}>{r.check_in?.slice(0,5)||"--:--"}</td>
+                  <td style={{padding:"6px 10px",color:"#f0a500"}}>{r.check_out?.slice(0,5)||"--:--"}</td>
                   <td style={{padding:"6px 10px",color:"#e8e0d0",fontWeight:600}}>{h.toFixed(1)}h</td>
                   <td style={{padding:"6px 10px"}}>
                     {hol&&<span style={{background:"#e05b0022",color:"#e05b00",borderRadius:4,padding:"2px 6px",fontSize:11,border:"1px solid #e05b0044"}}>🎌 國定假日</span>}
