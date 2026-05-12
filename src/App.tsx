@@ -59,8 +59,8 @@ function calcWage(emp, recs, schedRecs){
         holHours+=holReg;
         ot1+=holOt; // 超過8h的部分進加班費計算
       } else {
-        // 兼職/工讀：國定假日算正班工時，不加倍
-        reg+=h;
+        // 兼職/工讀：國定假日 ×1.34
+        reg+=h*1.34;
       }
     } else {
       if(emp.salary_type==="monthly"){
@@ -114,7 +114,7 @@ function SalaryEmpCard({emp,recs,schedRecs,w,S}){
           {l:emp.salary_type==="monthly"?"底薪":"正班薪資",v:`NT$ ${Math.round(w.base).toLocaleString()}`,warn:false},
           {l:`正班 ${w.reg.toFixed(1)}h`,v:"",warn:false},
           {l:`加班 ${(w.ot1+w.ot2).toFixed(1)}h`,v:`NT$ ${Math.round(w.ot).toLocaleString()}`,warn:false},
-          {l:emp.salary_type==="monthly"?`國定假日 ${w.holHours.toFixed(1)}h（補1倍）`:`國定假日 — 已含正班`,
+          {l:emp.salary_type==="monthly"?`國定假日 ${w.holHours.toFixed(1)}h（補1倍）`:`國定假日 ×1.34 已含正班`,
            v:emp.salary_type==="monthly"?`NT$ ${Math.round(w.holPay).toLocaleString()}`:"",warn:false},
           {l:"出勤天數",v:`${recs.length} 天`,warn:false},
           {l:"實際休假",v:`${w.actualRestDays} 天（應休 ${MONTHLY_REST_DAYS} 天）`,warn:false},
@@ -621,7 +621,7 @@ export default function App(){
             <button onClick={()=>{if(vm===11){setVm(0);setVy(y=>y+1)}else setVm(m=>m+1)}} style={S.nav}>›</button>
           </div>
           <div style={{fontSize:11,color:"#8a9ab0",marginBottom:12}}>
-            勞基法：平日加班前2h ×1.34、第3h起 ×1.67｜國定假日正職補1倍，超過8h再×1.34｜兼職/工讀假日正常計薪
+            勞基法：平日加班前2h ×1.34、第3h起 ×1.67｜國定假日正職補1倍，超過8h再×1.34｜兼職/工讀假日 ×1.34
           </div>
           {employees.map(emp=>{
             const recs=monthRecs(emp.id);
