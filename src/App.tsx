@@ -178,9 +178,12 @@ function SalaryEmpCard({emp,recs,schedRecs,w,S}){
 }
 
 function ShiftPopup({emp,date,current,onSave,onClose}){
+  const isMonthly=emp.salary_type==="monthly";
+  const defaultStart=isMonthly?"06:00":"09:00";
+  const defaultEnd=isMonthly?"14:00":"13:00";
   const[station,setStation]=useState(current?.station||"");
-  const[startTime,setStartTime]=useState(current?.start_time||"08:00");
-  const[endTime,setEndTime]=useState(current?.end_time||"16:00");
+  const[startTime,setStartTime]=useState(current?.start_time||defaultStart);
+  const[endTime,setEndTime]=useState(current?.end_time||defaultEnd);
   const isOff=station==="休假";
   return(
     <div style={{position:"fixed",inset:0,background:"#00000099",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={onClose}>
