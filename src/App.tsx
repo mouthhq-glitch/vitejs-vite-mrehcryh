@@ -73,9 +73,9 @@ function calcWage(emp, recs, schedRecs){
 
   const rate=emp.hourly_rate;
   const base=emp.salary_type==="monthly"?emp.monthly_rate:reg*rate;
-  // 平日加班費（不含國定假日超時）
-  const ot=ot1*rate*1.34+ot2*rate*1.67;
-  // 國定假日補發：8h補1倍 + 超時部分×1.34，全部合併顯示
+  // 加班費：所有加班時數（含國定假日超時）× 1.34
+  const ot=(ot1+ot2+holOtHours)*rate*1.34;
+  // 國定假日補發：8h補1倍 + 超時×1.34（獨立計算）
   const holPay=emp.salary_type==="monthly"
     ? holHours*rate*1+holOtHours*rate*1.34
     : 0;
@@ -613,7 +613,7 @@ export default function App(){
             <button onClick={()=>{if(vm===11){setVm(0);setVy(y=>y+1)}else setVm(m=>m+1)}} style={S.nav}>›</button>
           </div>
           <div style={{fontSize:11,color:"#8a9ab0",marginBottom:12}}>
-            勞基法：平日加班前2h ×1.34、第3h起 ×1.67｜國定假日正職補1倍，超過8h再×1.34｜兼職/工讀假日 ×1.34
+            加班費 ×1.34｜國定假日正職補1倍，超過8h再×1.34｜兼職/工讀假日 ×1.34
           </div>
           {employees.map(emp=>{
             const recs=monthRecs(emp.id);
