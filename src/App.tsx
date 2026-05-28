@@ -73,12 +73,10 @@ function calcWage(emp, recs, schedRecs){
 
   const rate=emp.hourly_rate;
   const base=emp.salary_type==="monthly"?emp.monthly_rate:reg*rate;
-  // 平日加班費（不含國定假日超時，那個歸入holPay）
-  const ot=ot1*rate*1.34+ot2*rate*1.67;
-  // 國定假日補發：8h內×1 + 超過8h×1.34，全部合併顯示
-  const holPay=emp.salary_type==="monthly"
-    ? holHours*rate*1 + holOtHours*rate*1.34
-    : 0;
+  // 平日加班費 + 國定假日超時加班費
+  const ot=ot1*rate*1.34+ot2*rate*1.67+holOtHours*rate*1.34;
+  // 國定假日補發：8h內×1（超時部分已在ot計算，這裡只算補1倍的部分）
+  const holPay=emp.salary_type==="monthly"?holHours*rate*1:0;
 
   const actualRestDays=schedRecs?schedRecs.filter(s=>s&&s.station==="休假").length:0;
   const missingRestDays=emp.salary_type==="monthly"?Math.max(0,MONTHLY_REST_DAYS-actualRestDays):0;
@@ -112,7 +110,7 @@ function SalaryEmpCard({emp,recs,schedRecs,w,S}){
         {[
           {l:emp.salary_type==="monthly"?"底薪":"正班薪資",v:`NT$ ${Math.round(w.base).toLocaleString()}`,warn:false},
           {l:`正班 ${w.reg.toFixed(1)}h`,v:"",warn:false},
-          {l:`加班 ${(w.ot1+w.ot2).toFixed(1)}h`,v:`NT$ ${Math.round(w.ot).toLocaleString()}`,warn:false},
+          {l:`加班 ${(w.ot1+w.ot2+w.holOtHours).toFixed(1)}h`,v:`NT$ ${Math.round(w.ot).toLocaleString()}`,warn:false},
           {l:holLabel,v:emp.salary_type==="monthly"?`NT$ ${Math.round(w.holPay).toLocaleString()}`:"",warn:false},
           {l:"出勤天數",v:`${recs.length} 天`,warn:false},
           {l:"實際休假",v:`${w.actualRestDays} 天（應休 ${MONTHLY_REST_DAYS} 天）`,warn:false},
