@@ -35,11 +35,12 @@ const fmt=d=>{
 };
 const getDays=(y,m)=>new Date(y,m+1,0).getDate();
 
-const MONTHLY_REST_DAYS = 8; // 月休天數
+const MONTHLY_REST_DAYS = 8;
 
 function calcWage(emp, recs, schedRecs){
   let reg=0, ot1=0, ot2=0;
-  let holHours=0; // 國定假日正職出勤小時（8h以內）
+  let holHours=0;   // 國定假日正職 8h以內
+  let holOtHours=0; // 國定假日正職超過8h部分
 
   recs.forEach(r=>{
     if(!r.check_in||!r.check_out)return;
@@ -47,49 +48,44 @@ function calcWage(emp, recs, schedRecs){
     const co=r.check_out.slice(0,5)+":00";
     let h=(new Date(`${r.work_date}T${co}`)-new Date(`${r.work_date}T${ci}`))/3600000;
     if(h<0)h+=24;
-    // 滿30分鐘才給半小時（無條件捨去至0.5h單位）
     h=Math.floor(h*2)/2;
     h=Math.max(0,h);
 
     if(isHol(r.work_date)){
       if(emp.salary_type==="monthly"){
-        // 正職月薪制：8h內補1倍，超過8h部分×1.34
-        const holReg=Math.min(h,8);
-        const holOt=Math.max(0,h-8);
-        holHours+=holReg;
-        ot1+=holOt; // 超過8h的部分進加班費計算
+        // 正職月薪制：8h內補1倍，超過8h部分×1.34（全部歸入holPay）
+        holHours+=Math.min(h,8);
+        holOtHours+=Math.max(0,h-8);
       } else {
         // 兼職/工讀：國定假日 ×1.34
         reg+=h*1.34;
       }
     } else {
       if(emp.salary_type==="monthly"){
-        // 月薪制正職：平日加班費計算
         if(h<=8) reg+=h;
         else if(h<=10){ reg+=8; ot1+=h-8; }
         else{ reg+=8; ot1+=2; ot2+=h-10; }
       } else {
-        // 時薪制（兼職/工讀）：全部算正班，不超過8h無加班
         reg+=h;
       }
     }
   });
 
   const rate=emp.hourly_rate;
-  // 月薪制底薪直接用monthly_rate；時薪制用實際出勤工時×時薪
   const base=emp.salary_type==="monthly"?emp.monthly_rate:reg*rate;
-  // 平日加班費（含國定假日正職超過8h部分）
+  // 平日加班費（不含國定假日超時，那個歸入holPay）
   const ot=ot1*rate*1.34+ot2*rate*1.67;
-  // 國定假日加給：正職月薪制補1倍（底薪已含當天，再補1倍）
-  const holPay=emp.salary_type==="monthly"?holHours*rate*1:0;
+  // 國定假日補發：8h內×1 + 超過8h×1.34，全部合併顯示
+  const holPay=emp.salary_type==="monthly"
+    ? holHours*rate*1 + holOtHours*rate*1.34
+    : 0;
 
-  // 月休不足加班費（只適用正職月薪制）
   const actualRestDays=schedRecs?schedRecs.filter(s=>s&&s.station==="休假").length:0;
   const missingRestDays=emp.salary_type==="monthly"?Math.max(0,MONTHLY_REST_DAYS-actualRestDays):0;
   const restOTPay=missingRestDays*8*rate*1.34;
 
   const total=base+ot+holPay+restOTPay+(emp.bonus||0);
-  return{reg,ot1,ot2,holHours,base,ot,holPay,actualRestDays,missingRestDays,restOTPay,bonus:emp.bonus||0,total};
+  return{reg,ot1,ot2,holHours,holOtHours,base,ot,holPay,actualRestDays,missingRestDays,restOTPay,bonus:emp.bonus||0,total};
 }
 
 function SalaryEmpCard({emp,recs,schedRecs,w,S}){
@@ -103,6 +99,9 @@ function SalaryEmpCard({emp,recs,schedRecs,w,S}){
     return Math.floor(h*2)/2;
   }
   const totalH=recs.reduce((s,r)=>s+calcH(r),0);
+  const holLabel=emp.salary_type==="monthly"
+    ? `國定假日 ${w.holHours.toFixed(1)}h補1倍${w.holOtHours>0?` +${w.holOtHours.toFixed(1)}h×1.34`:""}`
+    : `國定假日 ×1.34 已含正班`;
   return(
     <div style={S.card}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
@@ -114,8 +113,7 @@ function SalaryEmpCard({emp,recs,schedRecs,w,S}){
           {l:emp.salary_type==="monthly"?"底薪":"正班薪資",v:`NT$ ${Math.round(w.base).toLocaleString()}`,warn:false},
           {l:`正班 ${w.reg.toFixed(1)}h`,v:"",warn:false},
           {l:`加班 ${(w.ot1+w.ot2).toFixed(1)}h`,v:`NT$ ${Math.round(w.ot).toLocaleString()}`,warn:false},
-          {l:emp.salary_type==="monthly"?`國定假日 ${w.holHours.toFixed(1)}h（補1倍）`:`國定假日 ×1.34 已含正班`,
-           v:emp.salary_type==="monthly"?`NT$ ${Math.round(w.holPay).toLocaleString()}`:"",warn:false},
+          {l:holLabel,v:emp.salary_type==="monthly"?`NT$ ${Math.round(w.holPay).toLocaleString()}`:"",warn:false},
           {l:"出勤天數",v:`${recs.length} 天`,warn:false},
           {l:"實際休假",v:`${w.actualRestDays} 天（應休 ${MONTHLY_REST_DAYS} 天）`,warn:false},
           {l:`少休 ${w.missingRestDays} 天加班`,v:`NT$ ${Math.round(w.restOTPay).toLocaleString()}`,warn:w.missingRestDays>0},
@@ -130,7 +128,6 @@ function SalaryEmpCard({emp,recs,schedRecs,w,S}){
         ⚠️ {emp.name} 本月少休 {w.missingRestDays} 天，需補加班費 NT$ {Math.round(w.restOTPay).toLocaleString()}
       </div>}
 
-      {/* 每日明細展開 */}
       {recs.length>0&&<button onClick={()=>setOpen(o=>!o)}
         style={{marginTop:10,width:"100%",background:"#0f1923",border:"1px solid #2a3a4a",borderRadius:8,
           padding:"7px 12px",color:"#8a9ab0",fontSize:12,cursor:"pointer",fontFamily:"inherit",textAlign:"left"}}>
@@ -284,13 +281,12 @@ export default function App(){
   const[popup,setPopup]=useState(null);const[clockFixPopup,setClockFixPopup]=useState(null);
   const[deleteConfirm,setDeleteConfirm]=useState(null);
   const[deletePwd,setDeletePwd]=useState("");const[deleteErr,setDeleteErr]=useState("");
-  const[clockConfirm,setClockConfirm]=useState(null); // {empId, action}
+  const[clockConfirm,setClockConfirm]=useState(null);
   const[clockDate,setClockDate]=useState("");
   const now=new Date();const[vy,setVy]=useState(now.getFullYear());const[vm,setVm]=useState(now.getMonth());
   const isOwner=user?.role==="owner";const isStaff=user?.role==="staff";const demo=isDemo();
   const today=fmt(new Date());
   const effectiveClockDate=clockDate||today;
-  // 每分鐘強制 re-render 以更新 today
   const[,forceUpdate]=useState(0);
   useEffect(()=>{
     const id=setInterval(()=>forceUpdate(n=>n+1),60000);
@@ -319,7 +315,6 @@ export default function App(){
 
   useEffect(()=>{if(user)loadData();},[user,vy,vm]);
 
-  // 補打卡選到不同月份時，額外載入該日打卡資料
   useEffect(()=>{
     if(!user||demo||!clockDate)return;
     const [cy,cm2]=clockDate.split("-").map(Number);
@@ -449,7 +444,6 @@ export default function App(){
     [next[i],next[to]]=[next[to],next[i]];
     setEmployees(next);
     if(demo)return;
-    // 儲存新順序到資料庫
     try{
       await Promise.all(next.map((emp,idx)=>
         fetch(`${SUPABASE_URL}/rest/v1/employees?id=eq.${emp.id}`,{
@@ -476,7 +470,7 @@ export default function App(){
     {id:"employees",label:"👥 員工",ownerOnly:false,staffOnly:false},
   ].filter(t=>!t.ownerOnly||isOwner).filter(t=>!isStaff||t.staffOnly);
 
-  if(!user)return <Login onLogin={a=>{setUser(a);setTab("clock");setClockDate(fmt(new Date()));}}/>;;
+  if(!user)return <Login onLogin={a=>{setUser(a);setTab("clock");setClockDate(fmt(new Date()));}}/>;
 
   return(
     <div style={{minHeight:"100vh",background:"#0f1923",color:"#e8e0d0",fontFamily:"'Noto Sans TC',sans-serif"}}>
@@ -496,9 +490,7 @@ export default function App(){
 
       <div style={{padding:16,maxWidth:1200,margin:"0 auto"}}>
 
-        {/* 打卡 */}
         {tab==="clock"&&<div>
-          {/* 日期選擇器 */}
           <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14,flexWrap:"wrap"}}>
             <input type="date" value={effectiveClockDate} max={today}
               onChange={e=>setClockDate(e.target.value)}
@@ -546,7 +538,6 @@ export default function App(){
               </div>);})}
         </div>}
 
-        {/* 排班 */}
         {tab==="schedule"&&<div>
           <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14}}>
             <button onClick={()=>{if(vm===0){setVm(11);setVy(y=>y-1)}else setVm(m=>m-1)}} style={S.nav}>‹</button>
@@ -595,7 +586,6 @@ export default function App(){
           </div>
         </div>}
 
-        {/* 排班頁面月休統計 */}
         {tab==="schedule"&&employees.length>0&&<div style={{marginTop:16,...S.card}}>
           <div style={{fontWeight:600,fontSize:13,marginBottom:10,color:"#e8e0d0"}}>📊 本月休假統計（應休 {MONTHLY_REST_DAYS} 天）</div>
           <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
@@ -616,7 +606,6 @@ export default function App(){
           </div>
         </div>}
 
-        {/* 薪資（老闆限定）*/}
         {tab==="salary"&&isOwner&&<div>
           <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14}}>
             <button onClick={()=>{if(vm===0){setVm(11);setVy(y=>y-1)}else setVm(m=>m-1)}} style={S.nav}>‹</button>
@@ -634,7 +623,6 @@ export default function App(){
           })}
         </div>}
 
-        {/* 員工管理 */}
         {tab==="employees"&&<div>
           <button onClick={()=>setShowAdd(true)} style={{background:"linear-gradient(135deg,#f0a500,#e05b00)",border:"none",color:"white",borderRadius:10,padding:"10px 20px",fontWeight:700,fontSize:13,cursor:"pointer",marginBottom:16,fontFamily:"inherit"}}>＋ 新增員工</button>
           {showAdd&&<div style={{...S.card,border:"1px solid #f0a500",marginBottom:16}}>
@@ -661,7 +649,8 @@ export default function App(){
                     <option value="monthly">月薪制</option><option value="hourly">時薪制</option>
                   </select>
                 </div>
-              </>}            </div>
+              </>}
+            </div>
             <div style={{display:"flex",gap:10,marginTop:12}}>
               <button onClick={addEmp} style={{flex:1,background:"#f0a500",border:"none",color:"white",borderRadius:8,padding:10,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>確認新增</button>
               <button onClick={()=>setShowAdd(false)} style={{flex:1,background:"#2a3a4a",border:"none",color:"#e8e0d0",borderRadius:8,padding:10,cursor:"pointer",fontFamily:"inherit"}}>取消</button>
@@ -731,14 +720,8 @@ export default function App(){
               <div style={{fontWeight:700,fontSize:16,marginBottom:4,color:"#e05b00"}}>🗑 確認刪除員工</div>
               <div style={{fontSize:13,color:"#8a9ab0",marginBottom:16}}>即將刪除「{deleteConfirm.name}」，此操作無法復原。</div>
               <div style={{fontSize:11,color:"#8a9ab0",marginBottom:6}}>請輸入老闆密碼確認</div>
-              <input
-                type="password"
-                value={deletePwd}
-                onChange={e=>{setDeletePwd(e.target.value);setDeleteErr("");}}
-                onKeyDown={e=>e.key==="Enter"&&confirmDelete()}
-                placeholder="輸入密碼..."
-                style={{width:"100%",background:"#0f1923",border:`1px solid ${deleteErr?"#e05b00":"#2a3a4a"}`,borderRadius:8,padding:"9px 12px",color:"#e8e0d0",fontSize:14,boxSizing:"border-box",fontFamily:"inherit",outline:"none",marginBottom:6}}
-              />
+              <input type="password" value={deletePwd} onChange={e=>{setDeletePwd(e.target.value);setDeleteErr("");}} onKeyDown={e=>e.key==="Enter"&&confirmDelete()} placeholder="輸入密碼..."
+                style={{width:"100%",background:"#0f1923",border:`1px solid ${deleteErr?"#e05b00":"#2a3a4a"}`,borderRadius:8,padding:"9px 12px",color:"#e8e0d0",fontSize:14,boxSizing:"border-box",fontFamily:"inherit",outline:"none",marginBottom:6}}/>
               {deleteErr&&<div style={{color:"#e05b00",fontSize:12,marginBottom:10}}>⚠ {deleteErr}</div>}
               <div style={{display:"flex",gap:10,marginTop:10}}>
                 <button onClick={confirmDelete} style={{flex:1,background:"#4a1a1a",border:"1px solid #e05b00",color:"#e05b00",borderRadius:8,padding:11,fontWeight:700,cursor:"pointer",fontFamily:"inherit",fontSize:14}}>確認刪除</button>
@@ -760,13 +743,9 @@ export default function App(){
           </div>
           <div style={{display:"flex",gap:10}}>
             <button onClick={()=>{handleClock(clockConfirm.empId,clockConfirm.action);setClockConfirm(null);}}
-              style={{flex:1,background:clockConfirm.action==="in"?"#4caf50":"#f0a500",border:"none",color:"white",borderRadius:8,padding:11,fontWeight:700,cursor:"pointer",fontFamily:"inherit",fontSize:14}}>
-              確定
-            </button>
+              style={{flex:1,background:clockConfirm.action==="in"?"#4caf50":"#f0a500",border:"none",color:"white",borderRadius:8,padding:11,fontWeight:700,cursor:"pointer",fontFamily:"inherit",fontSize:14}}>確定</button>
             <button onClick={()=>setClockConfirm(null)}
-              style={{flex:1,background:"#2a3a4a",border:"none",color:"#e8e0d0",borderRadius:8,padding:11,cursor:"pointer",fontFamily:"inherit",fontSize:14}}>
-              取消
-            </button>
+              style={{flex:1,background:"#2a3a4a",border:"none",color:"#e8e0d0",borderRadius:8,padding:11,cursor:"pointer",fontFamily:"inherit",fontSize:14}}>取消</button>
           </div>
         </div>
       </div>}
