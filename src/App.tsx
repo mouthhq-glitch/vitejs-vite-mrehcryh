@@ -73,10 +73,12 @@ function calcWage(emp, recs, schedRecs){
 
   const rate=emp.hourly_rate;
   const base=emp.salary_type==="monthly"?emp.monthly_rate:reg*rate;
-  // 平日加班費 + 國定假日超時加班費
-  const ot=ot1*rate*1.34+ot2*rate*1.67+holOtHours*rate*1.34;
-  // 國定假日補發：8h內×1（超時部分已在ot計算，這裡只算補1倍的部分）
-  const holPay=emp.salary_type==="monthly"?holHours*rate*1:0;
+  // 平日加班費（不含國定假日超時）
+  const ot=ot1*rate*1.34+ot2*rate*1.67;
+  // 國定假日補發：8h補1倍 + 超時部分×1.34，全部合併顯示
+  const holPay=emp.salary_type==="monthly"
+    ? holHours*rate*1+holOtHours*rate*1.34
+    : 0;
 
   const actualRestDays=schedRecs?schedRecs.filter(s=>s&&s.station==="休假").length:0;
   const missingRestDays=emp.salary_type==="monthly"?Math.max(0,MONTHLY_REST_DAYS-actualRestDays):0;
