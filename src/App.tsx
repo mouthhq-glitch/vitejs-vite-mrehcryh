@@ -48,7 +48,8 @@ function calcWage(emp, recs, schedRecs){
     const co=r.check_out.slice(0,5)+":00";
     let h=(new Date(`${r.work_date}T${co}`)-new Date(`${r.work_date}T${ci}`))/3600000;
     if(h<0)h+=24;
-    h=Math.floor(h*2)/2;
+    // 以分鐘為單位計費（無條件捨去至分鐘）
+    h=Math.floor(h*60)/60;
     h=Math.max(0,h);
 
     if(isHol(r.work_date)){
@@ -96,7 +97,7 @@ function SalaryEmpCard({emp,recs,schedRecs,w,S}){
     const co=r.check_out.slice(0,5)+":00";
     let h=(new Date(`${r.work_date}T${co}`)-new Date(`${r.work_date}T${ci}`))/3600000;
     if(h<0)h+=24;
-    return Math.floor(h*2)/2;
+    return Math.floor(h*60)/60;
   }
   const totalH=recs.reduce((s,r)=>s+calcH(r),0);
   const holLabel=emp.salary_type==="monthly"
