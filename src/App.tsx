@@ -49,36 +49,13 @@ function calcWage(emp, recs, schedRecs){
   recs.forEach(r=>{
     if(!r.check_in||!r.check_out)return;
 
-    // 取得排班開始時間
-    const sched=schedRecs?schedRecs.find(s=>s&&s.work_date===r.work_date&&s.start_time):null;
-    const schedStart=sched?.start_time?.slice(0,5);
-
-    // 計算實際開始計費時間
-    let ci;
+    // 上班時間無條件進位至30分鐘單位
     const ciRaw=r.check_in.slice(0,5);
     const [ciH,ciM]=ciRaw.split(":").map(Number);
-
-    if(schedStart){
-      const [sH,sM]=schedStart.split(":").map(Number);
-      const schedMin=sH*60+sM;
-      const clockMin=ciH*60+ciM;
-      if(clockMin<=schedMin+5){
-        // 容許值內（早到或遲到5分鐘內）→ 從排班時間開始算
-        ci=`${String(sH).padStart(2,"0")}:${String(sM).padStart(2,"0")}:00`;
-      } else {
-        // 遲到超過5分鐘 → 進位到下一個30分鐘
-        const ciMCeil=Math.ceil(ciM/30)*30;
-        const ciHFinal=ciMCeil>=60?ciH+1:ciH;
-        const ciMFinal=ciMCeil>=60?ciMCeil-60:ciMCeil;
-        ci=`${String(ciHFinal).padStart(2,"0")}:${String(ciMFinal).padStart(2,"0")}:00`;
-      }
-    } else {
-      // 無排班記錄 → 進位到下一個30分鐘
-      const ciMCeil=ciM===0?0:Math.ceil(ciM/30)*30;
-      const ciHFinal=ciMCeil>=60?ciH+1:ciH;
-      const ciMFinal=ciMCeil>=60?ciMCeil-60:ciMCeil;
-      ci=`${String(ciHFinal).padStart(2,"0")}:${String(ciMFinal).padStart(2,"0")}:00`;
-    }
+    const ciMCeil=ciM===0?0:Math.ceil(ciM/30)*30;
+    const ciHFinal=ciMCeil>=60?ciH+1:ciH;
+    const ciMFinal=ciMCeil>=60?ciMCeil-60:ciMCeil;
+    const ci=`${String(ciHFinal).padStart(2,"0")}:${String(ciMFinal).padStart(2,"0")}:00`;
 
     // 下班時間以分鐘計費
     const co=r.check_out.slice(0,5)+":00";
@@ -344,7 +321,7 @@ export default function App(){
       ]);
       setEmployees(emps);
       const cm={};clocks.forEach(r=>cm[`${r.employee_id}_${r.work_date}`]={id:r.id,check_in:r.check_in,check_out:r.check_out,employee_id:r.employee_id,work_date:r.work_date});setClockMap(cm);
-      const sm={};scheds.forEach(r=>sm[`${r.employee_id}_${r.work_date}`]={station:r.station||"",start_time:r.start_time||"",end_time:r.end_time||""});setSchedMap(sm);
+      const sm={};scheds.forEach(r=>sm[`${r.employee_id}_${r.work_date}`]={station:r.station||"",start_time:r.start_time||null,end_time:r.end_time||null});setSchedMap(sm);
     }catch(e){toast_("連線失敗："+e.message,"error");}
     setLoading(false);
   }
