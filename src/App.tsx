@@ -39,16 +39,51 @@ const MONTHLY_REST_DAYS = 8;
 
 function calcWage(emp, recs, schedRecs){
   let reg=0, ot1=0, ot2=0;
-  let holHours=0;   // 國定假日正職 8h以內
-  let holOtHours=0; // 國定假日正職超過8h部分
+  let holHours=0;
+  let holOtHours=0;
+
+  // 建立日期→排班時間的對應表
+  const schedByDate={};
+  if(schedRecs){schedRecs.forEach(s=>{if(s&&s.start_time)schedByDate[s.work_date||""]=s;});}
 
   recs.forEach(r=>{
     if(!r.check_in||!r.check_out)return;
-    const ci=r.check_in.slice(0,5)+":00";
+
+    // 取得排班開始時間
+    const sched=schedRecs?schedRecs.find(s=>s&&s.work_date===r.work_date&&s.start_time):null;
+    const schedStart=sched?.start_time?.slice(0,5);
+
+    // 計算實際開始計費時間
+    let ci;
+    const ciRaw=r.check_in.slice(0,5);
+    const [ciH,ciM]=ciRaw.split(":").map(Number);
+
+    if(schedStart){
+      const [sH,sM]=schedStart.split(":").map(Number);
+      const schedMin=sH*60+sM;
+      const clockMin=ciH*60+ciM;
+      if(clockMin<=schedMin+5){
+        // 容許值內（早到或遲到5分鐘內）→ 從排班時間開始算
+        ci=`${String(sH).padStart(2,"0")}:${String(sM).padStart(2,"0")}:00`;
+      } else {
+        // 遲到超過5分鐘 → 進位到下一個30分鐘
+        const ciMCeil=Math.ceil(ciM/30)*30;
+        const ciHFinal=ciMCeil>=60?ciH+1:ciH;
+        const ciMFinal=ciMCeil>=60?ciMCeil-60:ciMCeil;
+        ci=`${String(ciHFinal).padStart(2,"0")}:${String(ciMFinal).padStart(2,"0")}:00`;
+      }
+    } else {
+      // 無排班記錄 → 進位到下一個30分鐘
+      const ciMCeil=ciM===0?0:Math.ceil(ciM/30)*30;
+      const ciHFinal=ciMCeil>=60?ciH+1:ciH;
+      const ciMFinal=ciMCeil>=60?ciMCeil-60:ciMCeil;
+      ci=`${String(ciHFinal).padStart(2,"0")}:${String(ciMFinal).padStart(2,"0")}:00`;
+    }
+
+    // 下班時間以分鐘計費
     const co=r.check_out.slice(0,5)+":00";
     let h=(new Date(`${r.work_date}T${co}`)-new Date(`${r.work_date}T${ci}`))/3600000;
     if(h<0)h+=24;
-    // 以分鐘為單位計費（無條件捨去至分鐘）
     h=Math.floor(h*60)/60;
     h=Math.max(0,h);
 
@@ -455,7 +490,7 @@ export default function App(){
   }
 
   function monthRecs(empId){return monthDays.map(d=>clockMap[`${empId}_${d}`]).filter(r=>r&&r.check_in);}
-  function monthSchedRecs(empId){return monthDays.map(d=>schedMap[`${empId}_${d}`]);}
+  function monthSchedRecs(empId){return monthDays.map(d=>({work_date:d,...(schedMap[`${empId}_${d}`]||{})}));}
 
   const S={
     card:{background:"#1a2a3a",borderRadius:12,padding:"14px 16px",marginBottom:10,border:"1px solid #2a3a4a"},
