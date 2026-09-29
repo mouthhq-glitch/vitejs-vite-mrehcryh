@@ -330,13 +330,14 @@ export default function App(){
   const mp=`${vy}-${String(vm+1).padStart(2,"0")}`;
   function toast_(msg,type="success"){setToast({msg,type});setTimeout(()=>setToast(null),3000);}
 
-  async function loadData(){
+  async function loadData(storeFilter){
+    const store=storeFilter!==undefined?storeFilter:userStore;
     if(demo){setEmployees(DEMO_EMP);return;}
     setLoading(true);
     try{
       const lastDay=String(getDays(vy,vm)).padStart(2,"0");
       const[emps,clocks,scheds]=await Promise.all([
-        db.get("employees",userStore?`?store=eq.${userStore}&order=sort_order`:"?order=sort_order"),
+        db.get("employees",store?`?store=eq.${store}&order=sort_order`:"?order=sort_order"),
         db.get("clock_records",`?work_date=gte.${mp}-01&work_date=lte.${mp}-${lastDay}`),
         db.get("schedules",`?work_date=gte.${mp}-01&work_date=lte.${mp}-${lastDay}`),
       ]);
@@ -347,7 +348,7 @@ export default function App(){
     setLoading(false);
   }
 
-  useEffect(()=>{if(user)loadData();},[user,vy,vm]);
+  useEffect(()=>{if(user)loadData(userStore);},[user,vy,vm,ownerStore]);
 
   useEffect(()=>{
     if(!user||demo||!clockDate)return;
@@ -517,8 +518,8 @@ export default function App(){
           <div style={{fontSize:11,color:"#8a9ab0"}}>{today}</div>
         </div>
         {isOwner&&<div style={{display:"flex",gap:4}}>
-          <button onClick={()=>{setOwnerStore("fengyuan");loadData();}} style={{padding:"4px 10px",borderRadius:8,border:"none",fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:"inherit",background:ownerStore==="fengyuan"?"#f0a500":"#2a3a4a",color:ownerStore==="fengyuan"?"white":"#8a9ab0"}}>豐原</button>
-          <button onClick={()=>{setOwnerStore("fengchia");loadData();}} style={{padding:"4px 10px",borderRadius:8,border:"none",fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:"inherit",background:ownerStore==="fengchia"?"#f0a500":"#2a3a4a",color:ownerStore==="fengchia"?"white":"#8a9ab0"}}>逢甲</button>
+          <button onClick={()=>{setOwnerStore("fengyuan");loadData("fengyuan");}} style={{padding:"4px 10px",borderRadius:8,border:"none",fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:"inherit",background:ownerStore==="fengyuan"?"#f0a500":"#2a3a4a",color:ownerStore==="fengyuan"?"white":"#8a9ab0"}}>豐原</button>
+          <button onClick={()=>{setOwnerStore("fengchia");loadData("fengchia");}} style={{padding:"4px 10px",borderRadius:8,border:"none",fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:"inherit",background:ownerStore==="fengchia"?"#f0a500":"#2a3a4a",color:ownerStore==="fengchia"?"white":"#8a9ab0"}}>逢甲</button>
         </div>}
         <div style={{background:isOwner?"#3a2a0a":"#1a2a3a",border:`1px solid ${isOwner?"#f0a500":"#4a6a8a"}`,borderRadius:20,padding:"4px 12px",fontSize:12,color:isOwner?"#f0a500":"#8ab0d0",fontWeight:600}}>{user.label}</div>
         <button onClick={()=>setUser(null)} style={{background:"#2a1a1a",border:"1px solid #4a2a2a",color:"#e05b00",borderRadius:8,padding:"6px 10px",fontSize:12,cursor:"pointer",fontFamily:"inherit"}}>登出</button>
