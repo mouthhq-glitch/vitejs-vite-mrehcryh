@@ -20,6 +20,7 @@ const ACCOUNTS=[
   {username:"mouthgood",password:"12345678",role:"staff",label:"👤 打卡",store:"fengyuan"},
   {username:"fengchia",password:"666666",role:"manager",label:"👔 逢甲店長",store:"fengchia"},
   {username:"fengchiastaff",password:"999999",role:"staff",label:"👤 逢甲打卡",store:"fengchia"},
+  {username:"fengchiatop",password:"88888888",role:"owner",label:"👑 逢甲股東",store:"fengchia"},
 ];
 const DEPARTMENTS=["門市","廚房","外場","行政"];
 const POSITIONS=["正職","兼職","工讀"];
@@ -318,7 +319,7 @@ export default function App(){
   const now=new Date();const[vy,setVy]=useState(now.getFullYear());const[vm,setVm]=useState(now.getMonth());
   const isOwner=user?.role==="owner";const isStaff=user?.role==="staff";const demo=isDemo();
   const[ownerStore,setOwnerStore]=useState("fengyuan"); // 老闆預設看豐原
-  const userStore=isOwner?ownerStore:user?.store||null;
+  const userStore=isOwner&&!user?.store?ownerStore:user?.store||null;
   const today=fmt(new Date());
   const effectiveClockDate=clockDate||today;
   const[,forceUpdate]=useState(0);
@@ -517,7 +518,7 @@ export default function App(){
           <div style={{fontWeight:700,fontSize:16}}>{userStore==="fengchia"?"卯食逢甲":"卯食豐原"}{isOwner?"（全店）":""}</div>
           <div style={{fontSize:11,color:"#8a9ab0"}}>{today}</div>
         </div>
-        {isOwner&&<div style={{display:"flex",gap:4}}>
+        {isOwner&&!user?.store&&<div style={{display:"flex",gap:4}}>
           <button onClick={()=>{setOwnerStore("fengyuan");loadData("fengyuan");}} style={{padding:"4px 10px",borderRadius:8,border:"none",fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:"inherit",background:ownerStore==="fengyuan"?"#f0a500":"#2a3a4a",color:ownerStore==="fengyuan"?"white":"#8a9ab0"}}>豐原</button>
           <button onClick={()=>{setOwnerStore("fengchia");loadData("fengchia");}} style={{padding:"4px 10px",borderRadius:8,border:"none",fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:"inherit",background:ownerStore==="fengchia"?"#f0a500":"#2a3a4a",color:ownerStore==="fengchia"?"white":"#8a9ab0"}}>逢甲</button>
         </div>}
