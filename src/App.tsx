@@ -14,7 +14,13 @@ const db={
 };
 
 const TW_HOLIDAYS=["2025-01-01","2025-01-27","2025-01-28","2025-01-29","2025-01-30","2025-01-31","2025-02-28","2025-04-03","2025-04-04","2025-04-05","2025-05-01","2025-05-31","2025-06-06","2025-09-28","2025-10-10","2026-01-01","2026-02-16","2026-02-17","2026-02-18","2026-02-19","2026-02-20","2026-02-27","2026-02-28","2026-04-03","2026-04-04","2026-04-05","2026-04-06","2026-05-01","2026-06-19","2026-09-25","2026-09-28","2026-10-09","2026-10-10","2026-10-25","2026-10-26","2026-12-25","2026-12-26","2026-12-27"];
-const ACCOUNTS=[{username:"boss",password:"25721828",role:"owner",label:"👑 老闆"},{username:"mouth",password:"88888888",role:"manager",label:"👔 店長"},{username:"mouthgood",password:"12345678",role:"staff",label:"👤 打卡"}];
+const ACCOUNTS=[
+  {username:"boss",password:"25721828",role:"owner",label:"👑 老闆",store:null},
+  {username:"mouth",password:"88888888",role:"manager",label:"👔 店長",store:"fengyuan"},
+  {username:"mouthgood",password:"12345678",role:"staff",label:"👤 打卡",store:"fengyuan"},
+  {username:"fengchia",password:"666666",role:"manager",label:"👔 逢甲店長",store:"fengchia"},
+  {username:"fengchiastaff",password:"999999",role:"staff",label:"👤 逢甲打卡",store:"fengchia"},
+];
 const DEPARTMENTS=["門市","廚房","外場","行政"];
 const POSITIONS=["正職","兼職","工讀"];
 const STATIONS=["製作1","製作2","煎台","麵線","烤土司","櫃檯","飲料","包裝","外場","備料","休假"];
@@ -311,6 +317,8 @@ export default function App(){
   const[clockDate,setClockDate]=useState("");
   const now=new Date();const[vy,setVy]=useState(now.getFullYear());const[vm,setVm]=useState(now.getMonth());
   const isOwner=user?.role==="owner";const isStaff=user?.role==="staff";const demo=isDemo();
+  const[ownerStore,setOwnerStore]=useState("fengyuan"); // 老闆預設看豐原
+  const userStore=isOwner?ownerStore:user?.store||null;
   const today=fmt(new Date());
   const effectiveClockDate=clockDate||today;
   const[,forceUpdate]=useState(0);
@@ -328,7 +336,7 @@ export default function App(){
     try{
       const lastDay=String(getDays(vy,vm)).padStart(2,"0");
       const[emps,clocks,scheds]=await Promise.all([
-        db.get("employees","?order=sort_order"),
+        db.get("employees",userStore?`?store=eq.${userStore}&order=sort_order`:"?order=sort_order"),
         db.get("clock_records",`?work_date=gte.${mp}-01&work_date=lte.${mp}-${lastDay}`),
         db.get("schedules",`?work_date=gte.${mp}-01&work_date=lte.${mp}-${lastDay}`),
       ]);
@@ -412,7 +420,8 @@ export default function App(){
     if(demo){setEmployees(p=>[...p,{...newEmp,id:Date.now(),hourly_rate:+newEmp.hourly_rate,monthly_rate:+newEmp.monthly_rate}]);setShowAdd(false);toast_("✅ 新增成功（Demo）");return;}
     try{
       await db.insert("employees",{name:newEmp.name,dept:newEmp.dept,position:newEmp.position,
-        hourly_rate:isOwner?+newEmp.hourly_rate:185,monthly_rate:isOwner?+newEmp.monthly_rate:28590,salary_type:isOwner?newEmp.salary_type:"hourly"});
+        hourly_rate:isOwner?+newEmp.hourly_rate:185,monthly_rate:isOwner?+newEmp.monthly_rate:28590,salary_type:isOwner?newEmp.salary_type:"hourly",
+        store:userStore||"fengyuan"});
       await loadData();setShowAdd(false);toast_("✅ 員工新增成功");
     }catch(e){toast_("新增失敗："+e.message,"error");}
   }
@@ -503,7 +512,14 @@ export default function App(){
       <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet"/>
       <div style={{background:"linear-gradient(135deg,#1a2a3a,#0f1923)",borderBottom:"1px solid #2a3a4a",padding:"12px 16px",display:"flex",alignItems:"center",gap:10}}>
         <div style={{width:38,height:38,borderRadius:10,background:"linear-gradient(135deg,#f0a500,#e05b00)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18}}>🏢</div>
-        <div style={{flex:1}}><div style={{fontWeight:700,fontSize:16}}>卯食豐原</div><div style={{fontSize:11,color:"#8a9ab0"}}>{today}</div></div>
+        <div style={{flex:1}}>
+          <div style={{fontWeight:700,fontSize:16}}>{userStore==="fengchia"?"卯食逢甲":"卯食豐原"}{isOwner?"（全店）":""}</div>
+          <div style={{fontSize:11,color:"#8a9ab0"}}>{today}</div>
+        </div>
+        {isOwner&&<div style={{display:"flex",gap:4}}>
+          <button onClick={()=>{setOwnerStore("fengyuan");loadData();}} style={{padding:"4px 10px",borderRadius:8,border:"none",fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:"inherit",background:ownerStore==="fengyuan"?"#f0a500":"#2a3a4a",color:ownerStore==="fengyuan"?"white":"#8a9ab0"}}>豐原</button>
+          <button onClick={()=>{setOwnerStore("fengchia");loadData();}} style={{padding:"4px 10px",borderRadius:8,border:"none",fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:"inherit",background:ownerStore==="fengchia"?"#f0a500":"#2a3a4a",color:ownerStore==="fengchia"?"white":"#8a9ab0"}}>逢甲</button>
+        </div>}
         <div style={{background:isOwner?"#3a2a0a":"#1a2a3a",border:`1px solid ${isOwner?"#f0a500":"#4a6a8a"}`,borderRadius:20,padding:"4px 12px",fontSize:12,color:isOwner?"#f0a500":"#8ab0d0",fontWeight:600}}>{user.label}</div>
         <button onClick={()=>setUser(null)} style={{background:"#2a1a1a",border:"1px solid #4a2a2a",color:"#e05b00",borderRadius:8,padding:"6px 10px",fontSize:12,cursor:"pointer",fontFamily:"inherit"}}>登出</button>
       </div>
