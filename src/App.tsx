@@ -97,16 +97,12 @@ function calcWage(emp, recs, schedRecs){
   const missingRestDays=emp.salary_type==="monthly"?Math.max(0,MONTHLY_REST_DAYS-actualRestDays):0;
   const restOTPay=missingRestDays*8*rate*1.34;
 
-  // 勞保：個人負擔 20%，公司負擔 70%，政府負擔 10%
-  const laborSalary=emp.labor_insurance_salary||0;
-  const laborPersonal=Math.round(laborSalary*0.2);
-  const laborCompany=Math.round(laborSalary*0.7);
-  // 健保：個人負擔 30%，公司負擔 60%，政府負擔 10%（無健保則為0）
+  // 勞健保：直接用老闆輸入的金額
+  const laborPersonal=emp.labor_personal||0;
+  const laborCompany=emp.labor_company||0;
   const healthEnabled=emp.health_insurance_enabled!==false;
-  const healthSalary=healthEnabled?(emp.health_insurance_salary||0):0;
-  const healthPersonal=Math.round(healthSalary*0.3);
-  const healthCompany=Math.round(healthSalary*0.6);
-  // 實領薪資（扣除個人負擔）
+  const healthPersonal=healthEnabled?(emp.health_personal||0):0;
+  const healthCompany=healthEnabled?(emp.health_company||0):0;
   const insuranceDeduct=laborPersonal+healthPersonal;
   const total=base+ot+holPay+restOTPay+(emp.bonus||0)-insuranceDeduct;
   return{reg,ot1,ot2,holHours,holOtHours,base,ot,holPay,actualRestDays,missingRestDays,restOTPay,bonus:emp.bonus||0,
@@ -449,7 +445,7 @@ export default function App(){
     if(demo){setEmployees(p=>p.map(e=>e.id===editEmp.id?{...editEmp,hourly_rate:+editEmp.hourly_rate,monthly_rate:+editEmp.monthly_rate}:e));setEditEmp(null);toast_("✅ 員工資料已更新");return;}
     try{
       const data={name:editEmp.name,dept:editEmp.dept,position:editEmp.position,phone:editEmp.phone||null,id_number:editEmp.id_number||null,birthday:editEmp.birthday||null,join_date:editEmp.join_date||null,note:editEmp.note||null};
-      if(isOwner){data.hourly_rate=+editEmp.hourly_rate;data.monthly_rate=+editEmp.monthly_rate;data.salary_type=editEmp.salary_type;data.bonus=+editEmp.bonus||0;data.daily_hours=+editEmp.daily_hours||8;data.labor_insurance_salary=+editEmp.labor_insurance_salary||0;data.health_insurance_salary=+editEmp.health_insurance_salary||0;data.health_insurance_enabled=editEmp.health_insurance_enabled!==false;}
+      if(isOwner){data.hourly_rate=+editEmp.hourly_rate;data.monthly_rate=+editEmp.monthly_rate;data.salary_type=editEmp.salary_type;data.bonus=+editEmp.bonus||0;data.daily_hours=+editEmp.daily_hours||8;data.labor_personal=+editEmp.labor_personal||0;data.labor_company=+editEmp.labor_company||0;data.health_personal=+editEmp.health_personal||0;data.health_company=+editEmp.health_company||0;data.health_insurance_enabled=editEmp.health_insurance_enabled!==false;}
       await fetch(`${SUPABASE_URL}/rest/v1/employees?id=eq.${editEmp.id}`,{method:"PATCH",headers:dbH(),body:JSON.stringify(data)});
       await loadData();setEditEmp(null);toast_("✅ 員工資料已更新");
     }catch(e){toast_("更新失敗："+e.message,"error");}
@@ -734,7 +730,8 @@ export default function App(){
                   <div><div style={{fontSize:11,color:"#8a9ab0",marginBottom:4}}>月薪(元)</div><input type="number" value={editEmp.monthly_rate||0} onChange={e=>setEditEmp(p=>({...p,monthly_rate:e.target.value}))} style={S.inp}/></div>
                   <div><div style={{fontSize:11,color:"#8a9ab0",marginBottom:4}}>每月獎金(元)</div><input type="number" value={editEmp.bonus||0} onChange={e=>setEditEmp(p=>({...p,bonus:e.target.value}))} style={S.inp}/></div>
                   <div><div style={{fontSize:11,color:"#8a9ab0",marginBottom:4}}>每日標準工時(h)</div><input type="number" step="0.5" value={editEmp.daily_hours||8} onChange={e=>setEditEmp(p=>({...p,daily_hours:e.target.value}))} style={S.inp}/></div>
-                  <div><div style={{fontSize:11,color:"#8a9ab0",marginBottom:4}}>勞保投保薪資(元)</div><input type="number" value={editEmp.labor_insurance_salary||0} onChange={e=>setEditEmp(p=>({...p,labor_insurance_salary:e.target.value}))} style={S.inp}/></div>
+                  <div><div style={{fontSize:11,color:"#8a9ab0",marginBottom:4}}>勞保個人(元/月)</div><input type="number" value={editEmp.labor_personal||0} onChange={e=>setEditEmp(p=>({...p,labor_personal:e.target.value}))} style={S.inp}/></div>
+                  <div><div style={{fontSize:11,color:"#8a9ab0",marginBottom:4}}>勞保公司(元/月)</div><input type="number" value={editEmp.labor_company||0} onChange={e=>setEditEmp(p=>({...p,labor_company:e.target.value}))} style={S.inp}/></div>
                   <div>
                     <div style={{fontSize:11,color:"#8a9ab0",marginBottom:4}}>健保</div>
                     <select value={editEmp.health_insurance_enabled===false?"false":"true"} onChange={e=>setEditEmp(p=>({...p,health_insurance_enabled:e.target.value==="true"}))} style={S.sel}>
@@ -742,7 +739,8 @@ export default function App(){
                       <option value="false">無健保</option>
                     </select>
                   </div>
-                  {editEmp.health_insurance_enabled!==false&&<div><div style={{fontSize:11,color:"#8a9ab0",marginBottom:4}}>健保投保薪資(元)</div><input type="number" value={editEmp.health_insurance_salary||0} onChange={e=>setEditEmp(p=>({...p,health_insurance_salary:e.target.value}))} style={S.inp}/></div>}
+                  {editEmp.health_insurance_enabled!==false&&<div><div style={{fontSize:11,color:"#8a9ab0",marginBottom:4}}>健保個人(元/月)</div><input type="number" value={editEmp.health_personal||0} onChange={e=>setEditEmp(p=>({...p,health_personal:e.target.value}))} style={S.inp}/></div>}
+                  {editEmp.health_insurance_enabled!==false&&<div><div style={{fontSize:11,color:"#8a9ab0",marginBottom:4}}>健保公司(元/月)</div><input type="number" value={editEmp.health_company||0} onChange={e=>setEditEmp(p=>({...p,health_company:e.target.value}))} style={S.inp}/></div>}
                   <div><div style={{fontSize:11,color:"#8a9ab0",marginBottom:4}}>薪資類型</div>
                     <select value={editEmp.salary_type||"hourly"} onChange={e=>setEditEmp(p=>({...p,salary_type:e.target.value}))} style={S.sel}>
                       <option value="monthly">月薪制</option><option value="hourly">時薪制</option>
