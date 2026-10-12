@@ -42,8 +42,6 @@ const fmt=d=>{
 };
 const getDays=(y,m)=>new Date(y,m+1,0).getDate();
 
-const MONTHLY_REST_DAYS = 8;
-
 function calcWage(emp, recs, schedRecs){
   let reg=0, ot1=0, ot2=0;
   let holHours=0;
@@ -101,7 +99,8 @@ function calcWage(emp, recs, schedRecs){
     : 0;
 
   const actualRestDays=schedRecs?schedRecs.filter(s=>s&&s.station==="休假").length:0;
-  const missingRestDays=emp.salary_type==="monthly"?Math.max(0,MONTHLY_REST_DAYS-actualRestDays):0;
+  const monthlyRestDays=+(emp.monthly_rest_days||8);
+  const missingRestDays=emp.salary_type==="monthly"?Math.max(0,monthlyRestDays-actualRestDays):0;
   const restOTPay=missingRestDays*8*rate*1.34;
 
   // 勞健保：直接用老闆輸入的金額
@@ -112,7 +111,7 @@ function calcWage(emp, recs, schedRecs){
   const healthCompany=healthEnabled?(emp.health_company||0):0;
   const insuranceDeduct=laborPersonal+healthPersonal;
   const total=base+ot+holPay+restOTPay+(emp.bonus||0)-insuranceDeduct;
-  return{reg,ot1,ot2,holHours,holOtHours,base,ot,holPay,actualRestDays,missingRestDays,restOTPay,bonus:emp.bonus||0,
+  return{reg,ot1,ot2,holHours,holOtHours,base,ot,holPay,actualRestDays,monthlyRestDays,missingRestDays,restOTPay,bonus:emp.bonus||0,
     laborPersonal,laborCompany,healthPersonal,healthCompany,insuranceDeduct,total};
 }
 
@@ -143,7 +142,7 @@ function SalaryEmpCard({emp,recs,schedRecs,w,S}){
           {l:`加班 ${(w.ot1+w.ot2+w.holOtHours).toFixed(1)}h`,v:`NT$ ${Math.round(w.ot).toLocaleString()}`,warn:false,deduct:false},
           {l:holLabel,v:emp.salary_type==="monthly"?`NT$ ${Math.round(w.holPay).toLocaleString()}`:"",warn:false,deduct:false},
           {l:"出勤天數",v:`${recs.length} 天`,warn:false,deduct:false},
-          {l:"實際休假",v:`${w.actualRestDays} 天（應休 ${MONTHLY_REST_DAYS} 天）`,warn:false,deduct:false},
+          {l:"實際休假",v:`${w.actualRestDays} 天（應休 ${w.monthlyRestDays} 天）`,warn:false,deduct:false},
           {l:`少休 ${w.missingRestDays} 天加班`,v:`NT$ ${Math.round(w.restOTPay).toLocaleString()}`,warn:w.missingRestDays>0,deduct:false},
           {l:"每月獎金",v:`NT$ ${Math.round(w.bonus).toLocaleString()}`,warn:false,deduct:false},
           {l:`勞保（個人）`,v:`-NT$ ${w.laborPersonal.toLocaleString()}`,warn:false,deduct:true},
@@ -456,7 +455,7 @@ export default function App(){
     if(demo){setEmployees(p=>p.map(e=>e.id===editEmp.id?{...editEmp,hourly_rate:+editEmp.hourly_rate,monthly_rate:+editEmp.monthly_rate}:e));setEditEmp(null);toast_("✅ 員工資料已更新");return;}
     try{
       const data={name:editEmp.name,dept:editEmp.dept,position:editEmp.position,phone:editEmp.phone||null,id_number:editEmp.id_number||null,birthday:editEmp.birthday||null,join_date:editEmp.join_date||null,note:editEmp.note||null};
-      if(isOwner){data.hourly_rate=+editEmp.hourly_rate;data.monthly_rate=+editEmp.monthly_rate;data.salary_type=editEmp.salary_type;data.bonus=+editEmp.bonus||0;data.daily_hours=+editEmp.daily_hours||8;data.labor_personal=+editEmp.labor_personal||0;data.labor_company=+editEmp.labor_company||0;data.health_personal=+editEmp.health_personal||0;data.health_company=+editEmp.health_company||0;data.health_insurance_enabled=editEmp.health_insurance_enabled!==false;}
+      if(isOwner){data.hourly_rate=+editEmp.hourly_rate;data.monthly_rate=+editEmp.monthly_rate;data.salary_type=editEmp.salary_type;data.bonus=+editEmp.bonus||0;data.daily_hours=+editEmp.daily_hours||8;data.monthly_rest_days=+editEmp.monthly_rest_days??8;data.sick_leave_used=+editEmp.sick_leave_used||0;data.labor_personal=+editEmp.labor_personal||0;data.labor_company=+editEmp.labor_company||0;data.health_personal=+editEmp.health_personal||0;data.health_company=+editEmp.health_company||0;data.health_insurance_enabled=editEmp.health_insurance_enabled!==false;}
       await fetch(`${SUPABASE_URL}/rest/v1/employees?id=eq.${editEmp.id}`,{method:"PATCH",headers:dbH(),body:JSON.stringify(data)});
       await loadData();setEditEmp(null);toast_("✅ 員工資料已更新");
     }catch(e){toast_("更新失敗："+e.message,"error");}
@@ -631,16 +630,18 @@ export default function App(){
         </div>}
 
         {tab==="schedule"&&employees.length>0&&<div style={{marginTop:16,...S.card}}>
-          <div style={{fontWeight:600,fontSize:13,marginBottom:10,color:"#e8e0d0"}}>📊 本月休假統計（應休 {MONTHLY_REST_DAYS} 天）</div>
+          <div style={{fontWeight:600,fontSize:13,marginBottom:10,color:"#e8e0d0"}}>📊 本月休假統計</div>
           <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
             {employees.filter(emp=>emp.salary_type==="monthly").map(emp=>{
               const schedRecs=monthSchedRecs(emp.id);
               const restDays=schedRecs.filter(s=>s&&s.station==="休假").length;
-              const missing=Math.max(0,MONTHLY_REST_DAYS-restDays);
+              const empRestDays=+(emp.monthly_rest_days||8);
+              const missing=Math.max(0,empRestDays-restDays);
               return(
                 <div key={emp.id} style={{background:"#0f1923",borderRadius:8,padding:"8px 12px",minWidth:120,border:`1px solid ${missing>0?"#f0a50066":"#2a3a4a"}`}}>
                   <div style={{fontWeight:600,fontSize:13}}>{emp.name}</div>
-                  <div style={{fontSize:12,color:missing>0?"#f0a500":"#4caf50",marginTop:4}}>
+                  <div style={{fontSize:11,color:"#8a9ab0"}}>應休 {empRestDays} 天</div>
+                  <div style={{fontSize:12,color:missing>0?"#f0a500":"#4caf50",marginTop:2}}>
                     已休 {restDays} 天 {missing>0?`⚠️ 少休 ${missing} 天`:"✅"}
                   </div>
                 </div>);
@@ -718,6 +719,19 @@ export default function App(){
                   {emp.birthday&&<div style={{fontSize:12,color:"#8a9ab0"}}>🎂 生日：{emp.birthday}</div>}
                   {emp.join_date&&<div style={{fontSize:12,color:"#8a9ab0"}}>📅 入職：{emp.join_date}</div>}
                   {isOwner&&<div style={{fontSize:12,color:"#f0a500",marginTop:2}}>時薪：NT$ {emp.hourly_rate}{emp.salary_type==="monthly"?`　月薪：NT$ ${emp.monthly_rate?.toLocaleString()}`:""}</div>}
+                  {isOwner&&(()=>{
+                    const used=+(emp.sick_leave_used||0);
+                    const total=30;
+                    const remain=Math.max(0,total-used);
+                    return(
+                      <div style={{fontSize:12,marginTop:4,background:"#0f1923",borderRadius:6,padding:"5px 8px",display:"inline-flex",gap:10,alignItems:"center"}}>
+                        <span style={{color:"#8a9ab0"}}>🏥 病假半薪</span>
+                        <span style={{color:used>0?"#f0a500":"#8a9ab0"}}>已用 {used} 天</span>
+                        <span style={{color:remain>0?"#4caf50":"#e05b00"}}>剩 {remain} 天</span>
+                        <span style={{color:"#555",fontSize:11}}>（全年{total}天）</span>
+                      </div>
+                    );
+                  })()}
                   {emp.note&&<div style={{fontSize:11,color:"#666",marginTop:2}}>備註：{emp.note}</div>}
                 </div>
                 <div style={{display:"flex",flexDirection:"column",gap:6}}>
@@ -748,6 +762,8 @@ export default function App(){
                   <div><div style={{fontSize:11,color:"#8a9ab0",marginBottom:4}}>月薪(元)</div><input type="number" value={editEmp.monthly_rate||0} onChange={e=>setEditEmp(p=>({...p,monthly_rate:e.target.value}))} style={S.inp}/></div>
                   <div><div style={{fontSize:11,color:"#8a9ab0",marginBottom:4}}>每月獎金(元)</div><input type="number" value={editEmp.bonus||0} onChange={e=>setEditEmp(p=>({...p,bonus:e.target.value}))} style={S.inp}/></div>
                   <div><div style={{fontSize:11,color:"#8a9ab0",marginBottom:4}}>每日標準工時(h)</div><input type="number" step="0.5" value={editEmp.daily_hours||8} onChange={e=>setEditEmp(p=>({...p,daily_hours:e.target.value}))} style={S.inp}/></div>
+                  <div><div style={{fontSize:11,color:"#8a9ab0",marginBottom:4}}>每月應休天數(天)</div><input type="number" value={editEmp.monthly_rest_days??8} onChange={e=>setEditEmp(p=>({...p,monthly_rest_days:e.target.value}))} style={S.inp}/></div>
+                  <div><div style={{fontSize:11,color:"#8a9ab0",marginBottom:4}}>病假已使用天數(天)</div><input type="number" step="0.5" value={editEmp.sick_leave_used??0} onChange={e=>setEditEmp(p=>({...p,sick_leave_used:e.target.value}))} style={S.inp}/></div>
                   <div><div style={{fontSize:11,color:"#8a9ab0",marginBottom:4}}>勞保個人(元/月)</div><input type="number" value={editEmp.labor_personal||0} onChange={e=>setEditEmp(p=>({...p,labor_personal:e.target.value}))} style={S.inp}/></div>
                   <div><div style={{fontSize:11,color:"#8a9ab0",marginBottom:4}}>勞保公司(元/月)</div><input type="number" value={editEmp.labor_company||0} onChange={e=>setEditEmp(p=>({...p,labor_company:e.target.value}))} style={S.inp}/></div>
                   <div>
