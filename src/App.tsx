@@ -381,9 +381,9 @@ function SalaryEmpCard({emp,recs,schedRecs,w,S,storeName,vy,vm}){
             if((w.ot1+w.ot2)>0)
               addRows.push({l:`加班費（${(w.ot1+w.ot2).toFixed(1)}h）`, v:Math.round(w.ot)});
             if(w.holHours>0)
-              addRows.push({l:`國定假日出勤（${w.holHours.toFixed(1)}h）`, v:Math.round(w.holHours*rate2)});
+              addRows.push({l:`國定假日上班加給（${w.holHours.toFixed(1)}h）`, v:Math.round(w.holHours*rate2)});
             if(w.holOtHours>0)
-              addRows.push({l:`國定假日加班補發（${w.holOtHours.toFixed(1)}h）`, v:Math.round(w.holOtHours*rate2)});
+              addRows.push({l:`國定假日加班加給（${w.holOtHours.toFixed(1)}h）`, v:Math.round(w.holOtHours*rate2)});
             if(w.missingRestDays>0)
               addRows.push({l:`少休加班費（${w.missingRestDays}天）`, v:Math.round(w.restOTPay)});
           } else {
