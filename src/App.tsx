@@ -173,8 +173,9 @@ function SalaryEmpCard({emp,recs,schedRecs,w,S,storeName,vy,vm}){
   const[open,setOpen]=useState(false);
   const slipRef=useRef(null);
 
+  const[slipImg,setSlipImg]=useState(null);
+
   async function saveAsImage(){
-    // 動態載入 html2canvas
     if(!window.html2canvas){
       await new Promise((res,rej)=>{
         const s=document.createElement("script");
@@ -186,11 +187,7 @@ function SalaryEmpCard({emp,recs,schedRecs,w,S,storeName,vy,vm}){
     const el=slipRef.current;
     if(!el)return;
     const canvas=await window.html2canvas(el,{backgroundColor:"#1a2a3a",scale:2,useCORS:true});
-    const img=canvas.toDataURL("image/png");
-    // 開新分頁顯示圖片，手機可長按儲存到相簿
-    const w2=window.open("","_blank");
-    w2.document.write(`<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>薪餉條_${emp.name}</title></head><body style="margin:0;background:#0f1923;display:flex;flex-direction:column;align-items:center;padding:16px"><img src="${img}" style="max-width:100%;border-radius:12px"><p style="color:#8a9ab0;font-size:13px;margin-top:12px;font-family:sans-serif">長按圖片→儲存到相簿</p></body></html>`);
-    w2.document.close();
+    setSlipImg(canvas.toDataURL("image/png"));
   }
 
   function calcH(r){
@@ -281,12 +278,17 @@ function SalaryEmpCard({emp,recs,schedRecs,w,S,storeName,vy,vm}){
         </table>
       </div>}
 
-      {/* 下載薪餉條按鈕 */}
+      {/* 薪餉條按鈕 */}
       <button onClick={saveAsImage}
         style={{marginTop:10,width:"100%",background:"#1a3a2a",border:"1px solid #4caf50",borderRadius:8,
           padding:"8px 12px",color:"#4caf50",fontSize:12,cursor:"pointer",fontFamily:"inherit",fontWeight:600}}>
-        📸 儲存薪餉條圖片
+        📸 產生薪餉條圖片
       </button>
+      {slipImg&&<div style={{marginTop:10,textAlign:"center"}}>
+        <div style={{fontSize:11,color:"#8a9ab0",marginBottom:6}}>👆 長按圖片→加入照片 即可存到相簿</div>
+        <img src={slipImg} style={{width:"100%",borderRadius:12,display:"block"}} alt="薪餉條"/>
+        <button onClick={()=>setSlipImg(null)} style={{marginTop:8,background:"#2a3a4a",border:"none",color:"#8a9ab0",borderRadius:8,padding:"6px 16px",fontSize:12,cursor:"pointer",fontFamily:"inherit"}}>關閉</button>
+      </div>}
 
       {/* 薪餉條（用於截圖，畫面外渲染） */}
       <div ref={slipRef} style={{position:"fixed",left:"-9999px",top:0,width:360,background:"#1a2a3a",padding:24,fontFamily:"'Noto Sans TC',sans-serif",color:"#e8e0d0",borderRadius:16}}>
