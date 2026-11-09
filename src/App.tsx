@@ -165,9 +165,10 @@ function calcWage(emp, recs, schedRecs){
   // 國定假日正班：再補1倍 → holHours×rate×1
   // 國定假日加班：底薪已付1倍，再補國定0.34倍+加班加給 → holOtHours×rate×1.34
   // （員工當天領：底薪1倍+holPay補1倍+holOtPay補0.34倍 = 正班共2倍，加班共1.34倍額外）
-  // holPay = 國定假日正班補發1倍（超時加班已在 ot 裡算了×1.34，不重複）
+  // holPay = 國定假日補發：正班補1倍 + 超時加班再補1倍（超時×1.34已在ot，但國定加班還要再+1倍）
+  // 國定加班員工應得：底薪1倍(已含) + ot×1.34 + 國定補1倍 = 共2.34倍
   const holPay=emp.salary_type==="monthly"
-    ? holHours*rate*1
+    ? holHours*rate*1 + holOtHours*rate*1
     : 0;
 
   // 休假天數：排班休假 + 所有短日（兩種都算休假）
@@ -381,6 +382,8 @@ function SalaryEmpCard({emp,recs,schedRecs,w,S,storeName,vy,vm}){
               addRows.push({l:`加班費（${(w.ot1+w.ot2).toFixed(1)}h）`, v:Math.round(w.ot)});
             if(w.holHours>0)
               addRows.push({l:`國定假日出勤（${w.holHours.toFixed(1)}h）`, v:Math.round(w.holHours*rate2)});
+            if(w.holOtHours>0)
+              addRows.push({l:`國定假日加班補發（${w.holOtHours.toFixed(1)}h）`, v:Math.round(w.holOtHours*rate2)});
             if(w.missingRestDays>0)
               addRows.push({l:`少休加班費（${w.missingRestDays}天）`, v:Math.round(w.restOTPay)});
           } else {
