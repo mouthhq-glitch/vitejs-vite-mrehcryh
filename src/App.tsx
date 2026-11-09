@@ -72,9 +72,14 @@ function calcWage(emp, recs, schedRecs){
       if(!r.check_in||!r.check_out)return;
       const ciRaw=r.check_in.slice(0,5);
       const[ciH,ciM]=ciRaw.split(":").map(Number);
-      const ciMCeil=ciM===0?0:Math.ceil(ciM/30)*30;
-      const ciHFinal=ciMCeil>=60?ciH+1:ciH;
-      const ciMFinal=ciMCeil>=60?ciMCeil-60:ciMCeil;
+      // 10分鐘寬限：整點後0-10分 → 算整點；半點後30-40分 → 算半點；其餘進位到下個30分
+      let adjM;
+      if(ciM<=10) adjM=0;           // 0-10分 → 整點（寬限）
+      else if(ciM<=30) adjM=30;     // 11-30分 → 進位到半點
+      else if(ciM<=40) adjM=30;     // 31-40分 → 半點（寬限）
+      else adjM=60;                  // 41-59分 → 進位到下個整點
+      const ciHFinal=adjM>=60?ciH+1:ciH;
+      const ciMFinal=adjM>=60?adjM-60:adjM;
       const ci=`${String(ciHFinal).padStart(2,"0")}:${String(ciMFinal).padStart(2,"0")}:00`;
       const co=r.check_out.slice(0,5)+":00";
       let h=(new Date(`${r.work_date}T${co}`)-new Date(`${r.work_date}T${ci}`))/3600000;
@@ -86,12 +91,15 @@ function calcWage(emp, recs, schedRecs){
     });
 
     // 先處理正常出勤（≥6h）
+    // 下班5分鐘寬限：超過dailyH不足5分鐘不算加班；超過5分鐘才算加班（全部超過時數都算）
+    const otThreshold=dailyH+5/60;
     normalRecs.forEach(({h,work_date})=>{
       if(isHol(work_date)){
+        const holOt=h>otThreshold?h-dailyH:0;
         holHours+=Math.min(h,dailyH);
-        holOtHours+=Math.max(0,h-dailyH);
+        holOtHours+=holOt;
       } else {
-        if(h<=dailyH) reg+=h;
+        if(h<=otThreshold){ reg+=Math.min(h,dailyH); }
         else{ reg+=dailyH; ot1+=h-dailyH; }
       }
     });
@@ -119,10 +127,14 @@ function calcWage(emp, recs, schedRecs){
       if(!r.check_in||!r.check_out)return;
       const ciRaw=r.check_in.slice(0,5);
       const[ciH,ciM]=ciRaw.split(":").map(Number);
-      const ciMCeil=ciM===0?0:Math.ceil(ciM/30)*30;
-      const ciHFinal=ciMCeil>=60?ciH+1:ciH;
-      const ciMFinal=ciMCeil>=60?ciMCeil-60:ciMCeil;
-      const ci=`${String(ciHFinal).padStart(2,"0")}:${String(ciMFinal).padStart(2,"0")}:00`;
+      let adjM2;
+      if(ciM<=10) adjM2=0;
+      else if(ciM<=30) adjM2=30;
+      else if(ciM<=40) adjM2=30;
+      else adjM2=60;
+      const ciHFinal2=adjM2>=60?ciH+1:ciH;
+      const ciMFinal2=adjM2>=60?adjM2-60:adjM2;
+      const ci=`${String(ciHFinal2).padStart(2,"0")}:${String(ciMFinal2).padStart(2,"0")}:00`;
       const co=r.check_out.slice(0,5)+":00";
       let h=(new Date(`${r.work_date}T${co}`)-new Date(`${r.work_date}T${ci}`))/3600000;
       if(h<0)h+=24;
