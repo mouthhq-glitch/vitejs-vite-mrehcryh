@@ -186,10 +186,11 @@ function SalaryEmpCard({emp,recs,schedRecs,w,S,storeName,vy,vm}){
     const el=slipRef.current;
     if(!el)return;
     const canvas=await window.html2canvas(el,{backgroundColor:"#1a2a3a",scale:2,useCORS:true});
-    const link=document.createElement("a");
-    link.download=`薪餉條_${emp.name}_${vy}年${vm+1}月.png`;
-    link.href=canvas.toDataURL("image/png");
-    link.click();
+    const img=canvas.toDataURL("image/png");
+    // 開新分頁顯示圖片，手機可長按儲存到相簿
+    const w2=window.open("","_blank");
+    w2.document.write(`<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>薪餉條_${emp.name}</title></head><body style="margin:0;background:#0f1923;display:flex;flex-direction:column;align-items:center;padding:16px"><img src="${img}" style="max-width:100%;border-radius:12px"><p style="color:#8a9ab0;font-size:13px;margin-top:12px;font-family:sans-serif">長按圖片→儲存到相簿</p></body></html>`);
+    w2.document.close();
   }
 
   function calcH(r){
