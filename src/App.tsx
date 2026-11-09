@@ -43,6 +43,7 @@ const fmt=d=>{
 const getDays=(y,m)=>new Date(y,m+1,0).getDate();
 
 function calcWage(emp, recs, schedRecs){
+  try{
   let reg=0, ot1=0, ot2=0;
   let holHours=0, holOtHours=0;
   let hourlyHolHours=0;
@@ -168,6 +169,10 @@ function calcWage(emp, recs, schedRecs){
   const total=base+ot+holPay+restOTPay+(emp.bonus||0)-insuranceDeduct;
   return{reg,ot1,ot2,holHours,holOtHours,shortDayHours,shortDayCount,shortDayRestCount,shortDayDeductCount,hourlyHolHours,base,ot,holPay,actualRestDays,monthlyRestDays,missingRestDays,restOTPay,bonus:emp.bonus||0,
     laborPersonal,laborCompany,healthPersonal,healthCompany,insuranceDeduct,total};
+  }catch(e){
+    console.error("calcWage error",emp?.name,e);
+    return{reg:0,ot1:0,ot2:0,holHours:0,holOtHours:0,shortDayHours:0,shortDayCount:0,shortDayRestCount:0,shortDayDeductCount:0,hourlyHolHours:0,base:0,ot:0,holPay:0,actualRestDays:0,monthlyRestDays:8,missingRestDays:0,restOTPay:0,bonus:0,laborPersonal:0,laborCompany:0,healthPersonal:0,healthCompany:0,insuranceDeduct:0,total:0};
+  }
 }
 
 function SalaryEmpCard({emp,recs,schedRecs,w,S,storeName,vy,vm}){
@@ -346,7 +351,8 @@ function SalaryEmpCard({emp,recs,schedRecs,w,S,storeName,vy,vm}){
               if(w.shortDayRestHours>0)
                 rows.push({l:`　假日來幫忙 ${w.shortDayRestHours.toFixed(1)}h×1.34`,v:`+NT$ ${Math.round(w.shortDayRestHours*emp.hourly_rate*1.34).toLocaleString()}`});
             } else {
-              rows.push({l:`正班時薪 ${(w.reg/emp.hourly_rate-(w.hourlyHolHours*0.34/emp.hourly_rate)).toFixed(1)}h × NT$${emp.hourly_rate}`,v:`NT$ ${Math.round(w.base-(w.hourlyHolHours*0.34*emp.hourly_rate)).toLocaleString()}`});
+              const _r=emp.hourly_rate||1;
+              rows.push({l:`正班時薪 ${(w.reg/_r-(w.hourlyHolHours*0.34/_r)).toFixed(1)}h × NT$${emp.hourly_rate||0}`,v:`NT$ ${Math.round(w.base-(w.hourlyHolHours*0.34*(emp.hourly_rate||0))).toLocaleString()}`});
               if(w.hourlyHolHours>0)
                 rows.push({l:`國定假日 ${w.hourlyHolHours.toFixed(1)}h × 0.34加給`,v:`+NT$ ${Math.round(w.hourlyHolHours*0.34*emp.hourly_rate).toLocaleString()}`});
             }
