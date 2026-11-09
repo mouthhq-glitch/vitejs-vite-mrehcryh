@@ -44,74 +44,116 @@ const getDays=(y,m)=>new Date(y,m+1,0).getDate();
 
 function calcWage(emp, recs, schedRecs){
   let reg=0, ot1=0, ot2=0;
-  let holHours=0;
-  let holOtHours=0;
-  let shortDayHours=0; // 正職未達6h，改以時薪計算的工時
-  let hourlyHolHours=0; // 兼職/工讀 國定假日實際時數（顯示用）
+  let holHours=0, holOtHours=0;
+  let hourlyHolHours=0;
+  // 短日統計
+  let shortDayRestCount=0;  // 短日算休假（假未滿，算加班+休假）
+  let shortDayDeductCount=0; // 短日算扣薪（假已滿，扣底薪補時薪）
+  let shortDayRestHours=0;   // 短日算休假的工時（×1.34）
+  let shortDayDeductHours=0; // 短日算扣薪的工時（普通時薪）
 
-  // 建立日期→排班時間的對應表
-  const schedByDate={};
-  if(schedRecs){schedRecs.forEach(s=>{if(s&&s.start_time)schedByDate[s.work_date||""]=s;});}
+  const today=fmt(new Date());
+  const monthlyRestDays=+(emp.monthly_rest_days||8);
+  const dailyH=+(emp.daily_hours||8);
+  const rate=emp.hourly_rate;
 
-  recs.forEach(r=>{
-    if(!r.check_in||!r.check_out)return;
+  if(emp.salary_type==="monthly"){
+    // 第一步：先算到今天為止的排班休假天數（不含短日）
+    // 短日由第二步決定屬於哪類
+    const scheduledRestDays=schedRecs
+      ?schedRecs.filter(s=>s&&s.station==="休假"&&s.work_date<=today).length
+      :0;
 
-    // 上班時間無條件進位至30分鐘單位
-    const ciRaw=r.check_in.slice(0,5);
-    const [ciH,ciM]=ciRaw.split(":").map(Number);
-    const ciMCeil=ciM===0?0:Math.ceil(ciM/30)*30;
-    const ciHFinal=ciMCeil>=60?ciH+1:ciH;
-    const ciMFinal=ciMCeil>=60?ciMCeil-60:ciMCeil;
-    const ci=`${String(ciHFinal).padStart(2,"0")}:${String(ciMFinal).padStart(2,"0")}:00`;
+    // 第二步：處理每筆打卡
+    // 先把短日記錄分出來，按日期排序後依序判斷
+    const normalRecs=[]; const shortRecs=[];
+    recs.forEach(r=>{
+      if(!r.check_in||!r.check_out)return;
+      const ciRaw=r.check_in.slice(0,5);
+      const[ciH,ciM]=ciRaw.split(":").map(Number);
+      const ciMCeil=ciM===0?0:Math.ceil(ciM/30)*30;
+      const ciHFinal=ciMCeil>=60?ciH+1:ciH;
+      const ciMFinal=ciMCeil>=60?ciMCeil-60:ciMCeil;
+      const ci=`${String(ciHFinal).padStart(2,"0")}:${String(ciMFinal).padStart(2,"0")}:00`;
+      const co=r.check_out.slice(0,5)+":00";
+      let h=(new Date(`${r.work_date}T${co}`)-new Date(`${r.work_date}T${ci}`))/3600000;
+      if(h<0)h+=24;
+      h=Math.floor(h*60)/60;
+      h=Math.max(0,h);
+      if(h<6) shortRecs.push({...r,h});
+      else normalRecs.push({...r,h});
+    });
 
-    // 下班時間以分鐘計費
-    const co=r.check_out.slice(0,5)+":00";
-    let h=(new Date(`${r.work_date}T${co}`)-new Date(`${r.work_date}T${ci}`))/3600000;
-    if(h<0)h+=24;
-    h=Math.floor(h*60)/60;
-    h=Math.max(0,h);
-    const dailyH=+(emp.daily_hours||8); // 每日標準工時，預設8h
-
-    // 正職月薪：工時不足6小時視為非正常出勤，改以時薪計算
-    const isShortDay=emp.salary_type==="monthly"&&h<6;
-
-    if(isHol(r.work_date)){
-      if(emp.salary_type==="monthly"&&!isShortDay){
-        // 正職月薪制：標準工時內補1倍，超過部分×1.34
+    // 先處理正常出勤（≥6h）
+    normalRecs.forEach(({h,work_date})=>{
+      if(isHol(work_date)){
         holHours+=Math.min(h,dailyH);
         holOtHours+=Math.max(0,h-dailyH);
       } else {
-        // 兼職/工讀 或 正職未達6h：國定假日 ×1.34
-        reg+=h*1.34;
-        if(isShortDay) shortDayHours+=h;
-        else hourlyHolHours+=h; // 兼職/工讀 國定假日時數
-      }
-    } else {
-      if(emp.salary_type==="monthly"&&!isShortDay){
         if(h<=dailyH) reg+=h;
         else{ reg+=dailyH; ot1+=h-dailyH; }
-      } else {
-        // 兼職/工讀 或 正職未達6h：以時薪計算
-        reg+=h;
-        if(isShortDay) shortDayHours+=h;
       }
-    }
-  });
+    });
 
-  const rate=emp.hourly_rate;
-  // 月薪制底薪 + 短日（<6h）以時薪額外計算；時薪制全部用時薪
+    // 再處理短日：累計已休天數（排班休假+已處理短日）來判斷
+    let accRest=scheduledRestDays;
+    shortRecs.sort((a,b)=>a.work_date.localeCompare(b.work_date));
+    shortRecs.forEach(({h,work_date})=>{
+      if(accRest<monthlyRestDays){
+        // 假未滿 → 放假日來幫忙，算休假+加班（×1.34）
+        shortDayRestCount++;
+        shortDayRestHours+=h;
+        accRest++;
+      } else {
+        // 假已滿 → 正常上班日遲到/早退，扣底薪補普通時薪
+        shortDayDeductCount++;
+        shortDayDeductHours+=h;
+        accRest++; // 也計入休假（這天視為休假處理）
+      }
+    });
+
+  } else {
+    // 時薪制：直接算
+    recs.forEach(r=>{
+      if(!r.check_in||!r.check_out)return;
+      const ciRaw=r.check_in.slice(0,5);
+      const[ciH,ciM]=ciRaw.split(":").map(Number);
+      const ciMCeil=ciM===0?0:Math.ceil(ciM/30)*30;
+      const ciHFinal=ciMCeil>=60?ciH+1:ciH;
+      const ciMFinal=ciMCeil>=60?ciMCeil-60:ciMCeil;
+      const ci=`${String(ciHFinal).padStart(2,"0")}:${String(ciMFinal).padStart(2,"0")}:00`;
+      const co=r.check_out.slice(0,5)+":00";
+      let h=(new Date(`${r.work_date}T${co}`)-new Date(`${r.work_date}T${ci}`))/3600000;
+      if(h<0)h+=24;
+      h=Math.floor(h*60)/60;
+      h=Math.max(0,h);
+      if(isHol(r.work_date)){reg+=h*1.34;hourlyHolHours+=h;}
+      else reg+=h;
+    });
+  }
+
+  const shortDayCount=shortDayRestCount+shortDayDeductCount;
+  const shortDayHours=shortDayRestHours+shortDayDeductHours;
+
+  const dailyRate=emp.salary_type==="monthly"?(emp.monthly_rate/30):0;
   const base=emp.salary_type==="monthly"
-    ? emp.monthly_rate + shortDayHours*rate
+    // 底薪 - 扣薪短日×(1/30底薪) + 扣薪短日時薪 + 加班短日時薪×1.34
+    ? emp.monthly_rate
+      - shortDayDeductCount*dailyRate
+      + shortDayDeductHours*rate
+      + shortDayRestHours*rate*1.34
     : reg*rate;
-  // 加班費：所有加班時數（含國定假日超時）× 1.34
+
   const ot=(ot1+ot2+holOtHours)*rate*1.34;
-  // 國定假日補發：8h補1倍 + 超時×1.34（獨立計算）
   const holPay=emp.salary_type==="monthly"
     ? holHours*rate*1+holOtHours*rate*1.34
     : 0;
 
-  const actualRestDays=schedRecs?schedRecs.filter(s=>s&&s.station==="休假").length:0;
-  const monthlyRestDays=+(emp.monthly_rest_days||8);
+  // 休假天數：排班休假 + 所有短日（兩種都算休假）
+  const scheduledRestForDisplay=schedRecs
+    ?schedRecs.filter(s=>s&&s.station==="休假"&&s.work_date<=today).length
+    :0;
+  const actualRestDays=scheduledRestForDisplay+shortDayCount;
   const missingRestDays=emp.salary_type==="monthly"?Math.max(0,monthlyRestDays-actualRestDays):0;
   const restOTPay=missingRestDays*8*rate*1.34;
 
@@ -123,7 +165,7 @@ function calcWage(emp, recs, schedRecs){
   const healthCompany=healthEnabled?(emp.health_company||0):0;
   const insuranceDeduct=laborPersonal+healthPersonal;
   const total=base+ot+holPay+restOTPay+(emp.bonus||0)-insuranceDeduct;
-  return{reg,ot1,ot2,holHours,holOtHours,shortDayHours,hourlyHolHours,base,ot,holPay,actualRestDays,monthlyRestDays,missingRestDays,restOTPay,bonus:emp.bonus||0,
+  return{reg,ot1,ot2,holHours,holOtHours,shortDayHours,shortDayCount,shortDayRestCount,shortDayDeductCount,hourlyHolHours,base,ot,holPay,actualRestDays,monthlyRestDays,missingRestDays,restOTPay,bonus:emp.bonus||0,
     laborPersonal,laborCompany,healthPersonal,healthCompany,insuranceDeduct,total};
 }
 
@@ -149,8 +191,10 @@ function SalaryEmpCard({emp,recs,schedRecs,w,S}){
       </div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,fontSize:12}}>
         {[
-          {l:emp.salary_type==="monthly"?"底薪（含短日時薪）":"正班薪資",v:`NT$ ${Math.round(w.base).toLocaleString()}`,warn:false,deduct:false},
-          {l:`正班 ${(w.reg - (emp.salary_type==="hourly"?w.hourlyHolHours*0.34:0)).toFixed(1)}h${emp.salary_type==="monthly"&&w.shortDayHours>0?` (含短日${w.shortDayHours.toFixed(1)}h)`:""}`  ,v:"",warn:false,deduct:false},
+          {l:emp.salary_type==="monthly"?"底薪":"正班薪資",v:`NT$ ${Math.round(w.base).toLocaleString()}`,warn:false,deduct:false},
+          {l:emp.salary_type==="monthly"
+            ?`正班 ${w.reg.toFixed(1)}h${w.shortDayRestCount>0?` +假日短日${w.shortDayRestCount}天×1.34`:""}${w.shortDayDeductCount>0?` +扣薪短日${w.shortDayDeductCount}天`:""}`
+            :`正班 ${(w.reg-(w.hourlyHolHours*0.34)).toFixed(1)}h`,v:"",warn:false,deduct:false},
           {l:`加班 ${(w.ot1+w.ot2+w.holOtHours).toFixed(1)}h`,v:`NT$ ${Math.round(w.ot).toLocaleString()}`,warn:false,deduct:false},
           {l:holLabel,v:emp.salary_type==="monthly"?`NT$ ${Math.round(w.holPay).toLocaleString()}`:w.hourlyHolHours>0?`${w.hourlyHolHours.toFixed(1)}h ×1.34`:"",warn:false,deduct:false},
           {l:"出勤天數",v:`${recs.length} 天`,warn:false,deduct:false},
