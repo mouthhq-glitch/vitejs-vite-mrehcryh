@@ -160,6 +160,9 @@ function calcWage(emp, recs, schedRecs){
 
   // 月薪：holOtHours 已在 holPay 裡算了，不可重複放進 ot
   const ot=(ot1+ot2)*rate*1.34;
+  // 月薪底薪已含正常1倍工資
+  // 國定假日正班：再補1倍 → holHours×rate×1
+  // 國定假日加班：底薪已付1倍，再補國定1倍+加班0.34倍 → holOtHours×rate×2.34
   const holPay=emp.salary_type==="monthly"
     ? holHours*rate*1+holOtHours*rate*1.34
     : 0;
