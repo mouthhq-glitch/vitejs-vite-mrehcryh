@@ -56,7 +56,7 @@ function calcWage(emp, recs, schedRecs){
   const today=fmt(new Date());
   const monthlyRestDays=+(emp.monthly_rest_days||8);
   const dailyH=+(emp.daily_hours||8);
-  const rate=emp.hourly_rate;
+  const rate=+(emp.hourly_rate||0);
 
   if(emp.salary_type==="monthly"){
     // 第一步：先算到今天為止的排班休假天數（不含短日）
@@ -176,6 +176,23 @@ function calcWage(emp, recs, schedRecs){
 }
 
 function SalaryEmpCard({emp,recs,schedRecs,w,S,storeName,vy,vm}){
+  // 防護：w 裡所有數值確保是數字
+  const safeW={
+    reg:+(w?.reg||0),ot1:+(w?.ot1||0),ot2:+(w?.ot2||0),
+    holHours:+(w?.holHours||0),holOtHours:+(w?.holOtHours||0),
+    hourlyHolHours:+(w?.hourlyHolHours||0),
+    shortDayCount:+(w?.shortDayCount||0),shortDayRestCount:+(w?.shortDayRestCount||0),
+    shortDayDeductCount:+(w?.shortDayDeductCount||0),
+    shortDayRestHours:+(w?.shortDayRestHours||0),shortDayDeductHours:+(w?.shortDayDeductHours||0),
+    shortDayHours:+(w?.shortDayHours||0),
+    base:+(w?.base||0),ot:+(w?.ot||0),holPay:+(w?.holPay||0),
+    actualRestDays:+(w?.actualRestDays||0),monthlyRestDays:+(w?.monthlyRestDays||8),
+    missingRestDays:+(w?.missingRestDays||0),restOTPay:+(w?.restOTPay||0),
+    bonus:+(w?.bonus||0),laborPersonal:+(w?.laborPersonal||0),laborCompany:+(w?.laborCompany||0),
+    healthPersonal:+(w?.healthPersonal||0),healthCompany:+(w?.healthCompany||0),
+    insuranceDeduct:+(w?.insuranceDeduct||0),total:+(w?.total||0),
+  };
+  w=safeW;
   const[open,setOpen]=useState(false);
   const slipRef=useRef(null);
 
@@ -870,7 +887,9 @@ export default function App(){
           {employees.map(emp=>{
             const recs=monthRecs(emp.id);
             const schedRecs=monthSchedRecs(emp.id);
-            const w=calcWage(emp,recs,schedRecs);
+            let w;
+            try{ w=calcWage(emp,recs,schedRecs); }catch(e){ console.error("wage error",emp?.name,e); }
+            if(!w)return <div key={emp.id} style={{...S.card,color:"#e05b00"}}>⚠️ {emp.name} 薪資計算錯誤，請聯絡管理員</div>;
             return <SalaryEmpCard key={emp.id} emp={emp} recs={recs} schedRecs={schedRecs} w={w} S={S} storeName={userStore==="fengchia"?"卯食逢甲":"卯食豐原"} vy={vy} vm={vm}/>;
           })}
         </div>}
