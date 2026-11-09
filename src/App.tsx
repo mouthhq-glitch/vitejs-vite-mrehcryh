@@ -253,7 +253,7 @@ function SalaryEmpCard({emp,recs,schedRecs,w,S,storeName,vy,vm}){
           {l:emp.salary_type==="monthly"
             ?`正班 ${w.reg.toFixed(1)}h${w.shortDayRestCount>0?` +假日短日${w.shortDayRestCount}天×1.34`:""}${w.shortDayDeductCount>0?` +扣薪短日${w.shortDayDeductCount}天`:""}`
             :`正班 ${(w.reg-(w.hourlyHolHours*0.34)).toFixed(1)}h`,v:"",warn:false,deduct:false},
-          {l:`加班 ${(w.ot1+w.ot2).toFixed(1)}h${w.holOtHours>0?` +國定加班${w.holOtHours.toFixed(1)}h`:""}`,v:`NT$ ${Math.round(w.ot).toLocaleString()}`,warn:false,deduct:false},
+          {l:`加班 ${(w.ot1+w.ot2).toFixed(1)}h${w.holOtHours>0?` +國定加班${w.holOtHours.toFixed(1)}h`:""}`,v:`NT$ ${Math.round(w.ot+(w.holOtHours*emp.hourly_rate*1.34)).toLocaleString()}`,warn:false,deduct:false},
           {l:holLabel,v:emp.salary_type==="monthly"?`NT$ ${Math.round(w.holPay).toLocaleString()}`:w.hourlyHolHours>0?`${w.hourlyHolHours.toFixed(1)}h ×1.34`:"",warn:false,deduct:false},
           {l:"出勤天數",v:`${recs.length} 天`,warn:false,deduct:false},
           {l:"實際休假",v:`${w.actualRestDays} 天（應休 ${w.monthlyRestDays} 天）`,warn:false,deduct:false},
