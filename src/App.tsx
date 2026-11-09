@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 const SUPABASE_URL = "https://wroquipkxlipwmuuagsi.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indyb3F1aXBreGxpcHdtdXVhZ3NpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcyMTYyNTQsImV4cCI6MjA5Mjc5MjI1NH0.W7ZZdjEm1U7tCOARmQmlF_INqz_94CxTJfT1UAHI3Pk";
@@ -169,8 +169,29 @@ function calcWage(emp, recs, schedRecs){
     laborPersonal,laborCompany,healthPersonal,healthCompany,insuranceDeduct,total};
 }
 
-function SalaryEmpCard({emp,recs,schedRecs,w,S}){
+function SalaryEmpCard({emp,recs,schedRecs,w,S,storeName,vy,vm}){
   const[open,setOpen]=useState(false);
+  const slipRef=useRef(null);
+
+  async function saveAsImage(){
+    // 動態載入 html2canvas
+    if(!window.html2canvas){
+      await new Promise((res,rej)=>{
+        const s=document.createElement("script");
+        s.src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js";
+        s.onload=res;s.onerror=rej;
+        document.head.appendChild(s);
+      });
+    }
+    const el=slipRef.current;
+    if(!el)return;
+    const canvas=await window.html2canvas(el,{backgroundColor:"#1a2a3a",scale:2,useCORS:true});
+    const link=document.createElement("a");
+    link.download=`薪餉條_${emp.name}_${vy}年${vm+1}月.png`;
+    link.href=canvas.toDataURL("image/png");
+    link.click();
+  }
+
   function calcH(r){
     if(!r.check_in||!r.check_out)return 0;
     const ci=r.check_in.slice(0,5)+":00";
@@ -258,6 +279,54 @@ function SalaryEmpCard({emp,recs,schedRecs,w,S}){
           </tfoot>
         </table>
       </div>}
+
+      {/* 下載薪餉條按鈕 */}
+      <button onClick={saveAsImage}
+        style={{marginTop:10,width:"100%",background:"#1a3a2a",border:"1px solid #4caf50",borderRadius:8,
+          padding:"8px 12px",color:"#4caf50",fontSize:12,cursor:"pointer",fontFamily:"inherit",fontWeight:600}}>
+        📸 儲存薪餉條圖片
+      </button>
+
+      {/* 薪餉條（用於截圖，畫面外渲染） */}
+      <div ref={slipRef} style={{position:"fixed",left:"-9999px",top:0,width:360,background:"#1a2a3a",padding:24,fontFamily:"'Noto Sans TC',sans-serif",color:"#e8e0d0",borderRadius:16}}>
+        <div style={{textAlign:"center",marginBottom:16,borderBottom:"1px solid #2a3a4a",paddingBottom:12}}>
+          <div style={{fontSize:18,fontWeight:700,color:"#f0a500"}}>{storeName}</div>
+          <div style={{fontSize:13,color:"#8a9ab0",marginTop:2}}>{vy}年{vm+1}月 薪餉條</div>
+        </div>
+        <div style={{marginBottom:14}}>
+          <div style={{fontSize:16,fontWeight:700}}>{emp.name}</div>
+          <div style={{fontSize:12,color:"#8a9ab0"}}>{emp.dept}｜{emp.position}</div>
+        </div>
+        <div style={{borderTop:"1px solid #2a3a4a",paddingTop:10}}>
+          {[
+            {l:emp.salary_type==="monthly"?"底薪":"正班薪資",v:`NT$ ${Math.round(w.base).toLocaleString()}`},
+            {l:`加班費`,v:`NT$ ${Math.round(w.ot).toLocaleString()}`},
+            emp.salary_type==="monthly"&&w.holPay>0&&{l:"國定假日補發",v:`NT$ ${Math.round(w.holPay).toLocaleString()}`},
+            emp.salary_type==="monthly"&&w.restOTPay>0&&{l:`少休${w.missingRestDays}天加班費`,v:`NT$ ${Math.round(w.restOTPay).toLocaleString()}`},
+            w.bonus>0&&{l:"獎金",v:`NT$ ${Math.round(w.bonus).toLocaleString()}`},
+          ].filter(Boolean).map((x,i)=>(
+            <div key={i} style={{display:"flex",justifyContent:"space-between",padding:"5px 0",fontSize:13,borderBottom:"1px solid #0f1923"}}>
+              <span style={{color:"#8a9ab0"}}>{x.l}</span>
+              <span style={{color:"#e8e0d0",fontWeight:600}}>{x.v}</span>
+            </div>
+          ))}
+          {(w.laborPersonal>0||w.healthPersonal>0)&&<>
+            <div style={{display:"flex",justifyContent:"space-between",padding:"5px 0",fontSize:13,borderBottom:"1px solid #0f1923"}}>
+              <span style={{color:"#a0a0d0"}}>勞保（個人）</span>
+              <span style={{color:"#a0a0d0"}}>-NT$ {w.laborPersonal.toLocaleString()}</span>
+            </div>
+            {w.healthPersonal>0&&<div style={{display:"flex",justifyContent:"space-between",padding:"5px 0",fontSize:13,borderBottom:"1px solid #0f1923"}}>
+              <span style={{color:"#a0a0d0"}}>健保（個人）</span>
+              <span style={{color:"#a0a0d0"}}>-NT$ {w.healthPersonal.toLocaleString()}</span>
+            </div>}
+          </>}
+        </div>
+        <div style={{marginTop:14,background:"#0f1923",borderRadius:10,padding:"12px 16px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <span style={{fontSize:14,color:"#8a9ab0",fontWeight:600}}>實領金額</span>
+          <span style={{fontSize:22,fontWeight:700,color:"#f0a500"}}>NT$ {Math.round(w.total).toLocaleString()}</span>
+        </div>
+        <div style={{marginTop:12,fontSize:10,color:"#555",textAlign:"center"}}>此為系統自動計算，如有疑問請洽店長</div>
+      </div>
     </div>
   );
 }
@@ -720,7 +789,7 @@ export default function App(){
             const recs=monthRecs(emp.id);
             const schedRecs=monthSchedRecs(emp.id);
             const w=calcWage(emp,recs,schedRecs);
-            return <SalaryEmpCard key={emp.id} emp={emp} recs={recs} schedRecs={schedRecs} w={w} S={S}/>;
+            return <SalaryEmpCard key={emp.id} emp={emp} recs={recs} schedRecs={schedRecs} w={w} S={S} storeName={userStore==="fengchia"?"卯食逢甲":"卯食豐原"} vy={vy} vm={vm}/>;
           })}
         </div>}
 
