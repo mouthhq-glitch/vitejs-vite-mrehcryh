@@ -98,6 +98,7 @@ function calcWage(emp, recs, schedRecs){
         const holOt=h>otThreshold?h-dailyH:0;
         holHours+=Math.min(h,dailyH);
         holOtHours+=holOt;
+        ot1+=holOt;
       } else {
         if(h<=otThreshold){ reg+=Math.min(h,dailyH); }
         else{ reg+=dailyH; ot1+=h-dailyH; }
@@ -162,9 +163,11 @@ function calcWage(emp, recs, schedRecs){
   const ot=(ot1+ot2)*rate*1.34;
   // 月薪底薪已含正常1倍工資
   // 國定假日正班：再補1倍 → holHours×rate×1
-  // 國定假日加班：底薪已付1倍，再補國定1倍+加班0.34倍 → holOtHours×rate×2.34
+  // 國定假日加班：底薪已付1倍，再補國定0.34倍+加班加給 → holOtHours×rate×1.34
+  // （員工當天領：底薪1倍+holPay補1倍+holOtPay補0.34倍 = 正班共2倍，加班共1.34倍額外）
+  // holPay = 國定假日正班補發1倍（超時加班已在 ot 裡算了×1.34，不重複）
   const holPay=emp.salary_type==="monthly"
-    ? holHours*rate*1+holOtHours*rate*1.34
+    ? holHours*rate*1
     : 0;
 
   // 休假天數：排班休假 + 所有短日（兩種都算休假）
@@ -231,7 +234,17 @@ function SalaryEmpCard({emp,recs,schedRecs,w,S,storeName,vy,vm}){
 
   function calcH(r){
     if(!r.check_in||!r.check_out)return 0;
-    const ci=r.check_in.slice(0,5)+":00";
+    // 套寬限，跟 calcWage 一致
+    const ciRaw=r.check_in.slice(0,5);
+    const[ciH,ciM]=ciRaw.split(":").map(Number);
+    let adjM;
+    if(ciM<=10) adjM=0;
+    else if(ciM<=30) adjM=30;
+    else if(ciM<=40) adjM=30;
+    else adjM=60;
+    const ciHF=adjM>=60?ciH+1:ciH;
+    const ciMF=adjM>=60?adjM-60:adjM;
+    const ci=`${String(ciHF).padStart(2,"0")}:${String(ciMF).padStart(2,"0")}:00`;
     const co=r.check_out.slice(0,5)+":00";
     let h=(new Date(`${r.work_date}T${co}`)-new Date(`${r.work_date}T${ci}`))/3600000;
     if(h<0)h+=24;
@@ -239,7 +252,7 @@ function SalaryEmpCard({emp,recs,schedRecs,w,S,storeName,vy,vm}){
   }
   const totalH=recs.reduce((s,r)=>s+calcH(r),0);
   const holLabel=emp.salary_type==="monthly"
-    ? `國定假日 ${w.holHours.toFixed(1)}h補1倍${w.holOtHours>0?` +${w.holOtHours.toFixed(1)}h×1.34`:""}`
+    ? `國定假日 ${w.holHours.toFixed(1)}h 補1倍`
     : `國定假日 ×1.34${w.hourlyHolHours>0?` (${w.hourlyHolHours.toFixed(1)}h)`:"（無）"}`;
   return(
     <div style={S.card}>
@@ -253,7 +266,7 @@ function SalaryEmpCard({emp,recs,schedRecs,w,S,storeName,vy,vm}){
           {l:emp.salary_type==="monthly"
             ?`正班 ${w.reg.toFixed(1)}h${w.shortDayRestCount>0?` +假日短日${w.shortDayRestCount}天×1.34`:""}${w.shortDayDeductCount>0?` +扣薪短日${w.shortDayDeductCount}天`:""}`
             :`正班 ${(w.reg-(w.hourlyHolHours*0.34)).toFixed(1)}h`,v:"",warn:false,deduct:false},
-          {l:`加班 ${(w.ot1+w.ot2).toFixed(1)}h${w.holOtHours>0?` +國定加班${w.holOtHours.toFixed(1)}h`:""}`,v:`NT$ ${Math.round(w.ot+(w.holOtHours*emp.hourly_rate*1.34)).toLocaleString()}`,warn:false,deduct:false},
+          {l:`加班 ${(w.ot1+w.ot2).toFixed(1)}h`,v:`NT$ ${Math.round(w.ot).toLocaleString()}`,warn:false,deduct:false},
           {l:holLabel,v:emp.salary_type==="monthly"?`NT$ ${Math.round(w.holPay).toLocaleString()}`:w.hourlyHolHours>0?`${w.hourlyHolHours.toFixed(1)}h ×1.34`:"",warn:false,deduct:false},
           {l:"出勤天數",v:`${recs.length} 天`,warn:false,deduct:false},
           {l:"實際休假",v:`${w.actualRestDays} 天（應休 ${w.monthlyRestDays} 天）`,warn:false,deduct:false},
@@ -330,117 +343,91 @@ function SalaryEmpCard({emp,recs,schedRecs,w,S,storeName,vy,vm}){
       </div>}
 
       {/* 薪餉條（用於截圖，畫面外渲染） */}
-      <div ref={slipRef} style={{position:"fixed",left:"-9999px",top:0,width:380,background:"#1a2a3a",padding:24,fontFamily:"'Noto Sans TC',sans-serif",color:"#e8e0d0",borderRadius:16}}>
+      <div ref={slipRef} style={{position:"fixed",left:"-9999px",top:0,width:360,background:"#ffffff",padding:24,fontFamily:"'Noto Sans TC','PingFang TC',sans-serif",color:"#1a1a1a",borderRadius:0}}>
         {/* 標題 */}
-        <div style={{textAlign:"center",marginBottom:16,borderBottom:"1px solid #2a3a4a",paddingBottom:12}}>
-          <div style={{fontSize:18,fontWeight:700,color:"#f0a500"}}>{storeName}</div>
-          <div style={{fontSize:13,color:"#8a9ab0",marginTop:2}}>{vy}年{vm+1}月 薪餉條</div>
-        </div>
-        {/* 員工資訊 */}
-        <div style={{marginBottom:14}}>
-          <div style={{fontSize:16,fontWeight:700}}>{emp.name}</div>
-          <div style={{fontSize:12,color:"#8a9ab0"}}>{emp.dept}｜{emp.position}　出勤 {recs.length} 天</div>
+        <div style={{textAlign:"center",marginBottom:16,borderBottom:"2px solid #1a1a1a",paddingBottom:14}}>
+          <div style={{fontSize:20,fontWeight:700,color:"#1a1a1a",letterSpacing:2}}>{storeName}</div>
+          <div style={{fontSize:14,color:"#555",marginTop:4,letterSpacing:1}}>{vy} 年 {vm+1} 月　薪資單</div>
         </div>
 
-        {/* ── 出勤工時明細 ── */}
-        <div style={{background:"#0f1923",borderRadius:8,padding:"10px 12px",marginBottom:10,fontSize:12}}>
-          <div style={{color:"#f0a500",fontWeight:700,marginBottom:6,fontSize:11,letterSpacing:1}}>【出勤工時】</div>
-          {(()=>{
-            const rows=[];
-            const totalWorkH=w.reg+(emp.salary_type==="monthly"?w.holHours:-(w.hourlyHolHours*0.34));
-            rows.push({l:"正班工時",v:`${totalWorkH.toFixed(1)} h`});
-            if(emp.salary_type==="monthly"&&w.holHours>0)
-              rows.push({l:"　其中國定假日",v:`${w.holHours.toFixed(1)} h（補1倍）`});
-            if(emp.salary_type==="hourly"&&w.hourlyHolHours>0)
-              rows.push({l:"　其中國定假日",v:`${w.hourlyHolHours.toFixed(1)} h（×1.34）`});
-            if((w.ot1+w.ot2)>0)
-              rows.push({l:"加班工時",v:`${(w.ot1+w.ot2).toFixed(1)} h`});
-            if(w.holOtHours>0)
-              rows.push({l:"國定假日加班",v:`${w.holOtHours.toFixed(1)} h（×1.34）`});
-            if(w.shortDayRestCount>0)
-              rows.push({l:`短日來幫忙`,v:`${w.shortDayRestCount} 天 / ${w.shortDayRestHours.toFixed(1)} h（×1.34）`});
+        {/* 員工姓名＋出勤 */}
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-end",marginBottom:16,borderBottom:"1px solid #ddd",paddingBottom:12}}>
+          <div>
+            <div style={{fontSize:22,fontWeight:700,color:"#1a1a1a"}}>{emp.name}</div>
+            <div style={{fontSize:12,color:"#777",marginTop:3}}>{emp.dept}　{emp.position}</div>
+          </div>
+          <div style={{textAlign:"right",fontSize:12,color:"#555"}}>
+            <div>出勤 <strong>{recs.length}</strong> 天</div>
+            {emp.salary_type==="monthly"&&<div>休假 <strong>{w.actualRestDays}</strong> 天</div>}
+          </div>
+        </div>
+
+        {/* 加項清單 */}
+        {(()=>{
+          const addRows=[];
+          const deductRows=[];
+          const rate2=emp.hourly_rate||0;
+
+          if(emp.salary_type==="monthly"){
+            addRows.push({l:"底薪", v:Math.round(emp.monthly_rate||0)});
             if(w.shortDayDeductCount>0)
-              rows.push({l:`短日遲到/早退`,v:`${w.shortDayDeductCount} 天 / ${w.shortDayDeductHours.toFixed(1)} h`});
-            return rows.map((x,i)=>(
-              <div key={i} style={{display:"flex",justifyContent:"space-between",padding:"3px 0",borderBottom:"1px solid #1a2a3a"}}>
-                <span style={{color:"#8a9ab0"}}>{x.l}</span>
-                <span style={{color:"#e8e0d0"}}>{x.v}</span>
-              </div>
-            ));
-          })()}
-        </div>
+              addRows.push({l:`請假扣薪（${w.shortDayDeductCount}天）`, v:-Math.round(w.shortDayDeductCount*((emp.monthly_rate||0)/30)), neg:true});
+            if(w.shortDayDeductHours>0)
+              addRows.push({l:`假日出勤補回（${w.shortDayDeductHours.toFixed(1)}h）`, v:Math.round(w.shortDayDeductHours*rate2)});
+            if(w.shortDayRestHours>0)
+              addRows.push({l:`休假日出勤加給（${w.shortDayRestHours.toFixed(1)}h）`, v:Math.round(w.shortDayRestHours*rate2*1.34)});
+            // ot1 已含國定超時，直接顯示總加班工時
+            if((w.ot1+w.ot2)>0)
+              addRows.push({l:`加班費（${(w.ot1+w.ot2).toFixed(1)}h）`, v:Math.round(w.ot)});
+            if(w.holHours>0)
+              addRows.push({l:`國定假日出勤（${w.holHours.toFixed(1)}h）`, v:Math.round(w.holHours*rate2)});
+            if(w.missingRestDays>0)
+              addRows.push({l:`少休加班費（${w.missingRestDays}天）`, v:Math.round(w.restOTPay)});
+          } else {
+            addRows.push({l:`正班薪資（${(w.reg-w.hourlyHolHours*0.34).toFixed(1)}h）`, v:Math.round(w.base-w.hourlyHolHours*0.34*rate2)});
+            if(w.hourlyHolHours>0)
+              addRows.push({l:`國定假日加給（${w.hourlyHolHours.toFixed(1)}h）`, v:Math.round(w.hourlyHolHours*0.34*rate2)});
+          }
+          if(w.bonus>0)
+            addRows.push({l:"獎金", v:Math.round(w.bonus)});
 
-        {/* ── 薪資加項 ── */}
-        <div style={{background:"#0f1923",borderRadius:8,padding:"10px 12px",marginBottom:10,fontSize:12}}>
-          <div style={{color:"#4caf50",fontWeight:700,marginBottom:6,fontSize:11,letterSpacing:1}}>【應發薪資】</div>
-          {(()=>{
-            const rows=[];
-            if(emp.salary_type==="monthly"){
-              rows.push({l:"底薪（月薪制）",v:`NT$ ${Math.round(emp.monthly_rate||0).toLocaleString()}`});
-              if(w.shortDayDeductCount>0)
-                rows.push({l:`　扣：短日${w.shortDayDeductCount}天（各-1/30底薪）`,v:`-NT$ ${Math.round(w.shortDayDeductCount*((emp.monthly_rate||0)/30)).toLocaleString()}`,neg:true});
-              if(w.shortDayDeductHours>0)
-                rows.push({l:`　補：短日時薪 ${w.shortDayDeductHours.toFixed(1)}h`,v:`+NT$ ${Math.round(w.shortDayDeductHours*emp.hourly_rate).toLocaleString()}`});
-              if(w.shortDayRestHours>0)
-                rows.push({l:`　假日來幫忙 ${w.shortDayRestHours.toFixed(1)}h×1.34`,v:`+NT$ ${Math.round(w.shortDayRestHours*emp.hourly_rate*1.34).toLocaleString()}`});
-            } else {
-              const _r=emp.hourly_rate||1;
-              rows.push({l:`正班時薪 ${(w.reg/_r-(w.hourlyHolHours*0.34/_r)).toFixed(1)}h × NT$${emp.hourly_rate||0}`,v:`NT$ ${Math.round(w.base-(w.hourlyHolHours*0.34*(emp.hourly_rate||0))).toLocaleString()}`});
-              if(w.hourlyHolHours>0)
-                rows.push({l:`國定假日 ${w.hourlyHolHours.toFixed(1)}h × 0.34加給`,v:`+NT$ ${Math.round(w.hourlyHolHours*0.34*emp.hourly_rate).toLocaleString()}`});
-            }
-            if(w.ot>0)
-              rows.push({l:`加班費（${(w.ot1+w.ot2).toFixed(1)}h × 1.34）`,v:`+NT$ ${Math.round(w.ot).toLocaleString()}`});
-            if(w.holPay>0&&emp.salary_type==="monthly")
-              rows.push({l:`國定假日補發（${w.holHours.toFixed(1)}h+加班${w.holOtHours.toFixed(1)}h×1.34）`,v:`+NT$ ${Math.round(w.holPay).toLocaleString()}`});
-            if(w.restOTPay>0)
-              rows.push({l:`少休${w.missingRestDays}天加班費`,v:`+NT$ ${Math.round(w.restOTPay).toLocaleString()}`});
-            if(w.bonus>0)
-              rows.push({l:"獎金",v:`+NT$ ${Math.round(w.bonus).toLocaleString()}`});
-            return rows.map((x,i)=>(
-              <div key={i} style={{display:"flex",justifyContent:"space-between",padding:"3px 0",borderBottom:"1px solid #1a2a3a"}}>
-                <span style={{color:x.neg?"#e05b00":"#8a9ab0"}}>{x.l}</span>
-                <span style={{color:x.neg?"#e05b00":"#4caf50",fontWeight:600}}>{x.v}</span>
-              </div>
-            ));
-          })()}
-        </div>
+          if(w.laborPersonal>0)
+            deductRows.push({l:"勞保費（自付）", v:w.laborPersonal});
+          if(w.healthPersonal>0)
+            deductRows.push({l:"健保費（自付）", v:w.healthPersonal});
 
-        {/* ── 扣除項目 ── */}
-        {(w.laborPersonal>0||w.healthPersonal>0)&&(
-          <div style={{background:"#0f1923",borderRadius:8,padding:"10px 12px",marginBottom:10,fontSize:12}}>
-            <div style={{color:"#a0a0d0",fontWeight:700,marginBottom:6,fontSize:11,letterSpacing:1}}>【應扣項目】</div>
-            {w.laborPersonal>0&&(
-              <div style={{display:"flex",justifyContent:"space-between",padding:"3px 0",borderBottom:"1px solid #1a2a3a"}}>
-                <span style={{color:"#a0a0d0"}}>勞保（個人負擔）</span>
-                <span style={{color:"#e05b00",fontWeight:600}}>-NT$ {w.laborPersonal.toLocaleString()}</span>
+          // totalAdd unused, kept for reference
+
+          const Row=({l,v,neg,last})=>(
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",
+              padding:"9px 0",borderBottom:last?"none":"1px solid #eee"}}>
+              <span style={{fontSize:13,color: neg?"#c0392b":"#333"}}>{l}</span>
+              <span style={{fontSize:14,fontWeight:600,color:neg?"#c0392b":"#1a7a3c",minWidth:90,textAlign:"right"}}>
+                {neg?"-":"+"}NT$ {Math.abs(v).toLocaleString()}
+              </span>
+            </div>
+          );
+
+          return(<>
+            <div style={{marginBottom:14}}>
+              <div style={{fontSize:11,fontWeight:700,color:"#777",letterSpacing:2,marginBottom:6}}>收　入</div>
+              {addRows.map((r,i)=><Row key={i} l={r.l} v={Math.abs(r.v)} neg={r.neg} last={i===addRows.length-1}/>)}
+            </div>
+            {deductRows.length>0&&(
+              <div style={{marginBottom:14}}>
+                <div style={{fontSize:11,fontWeight:700,color:"#777",letterSpacing:2,marginBottom:6}}>扣　款</div>
+                {deductRows.map((r,i)=><Row key={i} l={r.l} v={r.v} neg={true} last={i===deductRows.length-1}/>)}
               </div>
             )}
-            {w.healthPersonal>0&&(
-              <div style={{display:"flex",justifyContent:"space-between",padding:"3px 0",borderBottom:"1px solid #1a2a3a"}}>
-                <span style={{color:"#a0a0d0"}}>健保（個人負擔）</span>
-                <span style={{color:"#e05b00",fontWeight:600}}>-NT$ {w.healthPersonal.toLocaleString()}</span>
-              </div>
-            )}
-          </div>
-        )}
+          </>);
+        })()}
 
-        {/* ── 實領金額 ── */}
-        <div style={{marginTop:4,background:"#0f1923",borderRadius:10,padding:"14px 16px"}}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
-            <span style={{fontSize:13,color:"#8a9ab0"}}>應發合計</span>
-            <span style={{fontSize:13,color:"#4caf50",fontWeight:600}}>NT$ {Math.round(w.base+w.ot+w.holPay+w.restOTPay+w.bonus).toLocaleString()}</span>
-          </div>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-            <span style={{fontSize:13,color:"#8a9ab0"}}>應扣合計</span>
-            <span style={{fontSize:13,color:"#e05b00",fontWeight:600}}>-NT$ {w.insuranceDeduct.toLocaleString()}</span>
-          </div>
-          <div style={{borderTop:"1px solid #2a3a4a",paddingTop:10,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-            <span style={{fontSize:15,color:"#e8e0d0",fontWeight:700}}>實領金額</span>
-            <span style={{fontSize:24,fontWeight:700,color:"#f0a500"}}>NT$ {Math.round(w.total).toLocaleString()}</span>
-          </div>
+        {/* 實領金額 */}
+        <div style={{borderTop:"2px solid #1a1a1a",marginTop:4,paddingTop:14,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <span style={{fontSize:16,fontWeight:700,color:"#1a1a1a"}}>實領金額</span>
+          <span style={{fontSize:28,fontWeight:700,color:"#c0392b"}}>NT$ {Math.round(w.total).toLocaleString()}</span>
         </div>
-        <div style={{marginTop:12,fontSize:10,color:"#555",textAlign:"center"}}>此為系統自動計算，如有疑問請洽店長</div>
+        <div style={{marginTop:14,fontSize:10,color:"#aaa",textAlign:"center",borderTop:"1px solid #eee",paddingTop:10}}>如有疑問請洽店長</div>
       </div>
     </div>
   );
