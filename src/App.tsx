@@ -136,10 +136,11 @@ function calcWage(emp, recs, schedRecs){
   const shortDayCount=shortDayRestCount+shortDayDeductCount;
   const shortDayHours=shortDayRestHours+shortDayDeductHours;
 
-  const dailyRate=emp.salary_type==="monthly"?(emp.monthly_rate/30):0;
+  const monthlyRate=+(emp.monthly_rate||0);
+  const dailyRate=emp.salary_type==="monthly"?(monthlyRate/30):0;
   const base=emp.salary_type==="monthly"
     // 底薪 - 扣薪短日×(1/30底薪) + 扣薪短日時薪 + 加班短日時薪×1.34
-    ? emp.monthly_rate
+    ? monthlyRate
       - shortDayDeductCount*dailyRate
       + shortDayDeductHours*rate
       + shortDayRestHours*rate*1.34
@@ -167,11 +168,11 @@ function calcWage(emp, recs, schedRecs){
   const healthCompany=healthEnabled?(emp.health_company||0):0;
   const insuranceDeduct=laborPersonal+healthPersonal;
   const total=base+ot+holPay+restOTPay+(emp.bonus||0)-insuranceDeduct;
-  return{reg,ot1,ot2,holHours,holOtHours,shortDayHours,shortDayCount,shortDayRestCount,shortDayDeductCount,hourlyHolHours,base,ot,holPay,actualRestDays,monthlyRestDays,missingRestDays,restOTPay,bonus:emp.bonus||0,
+  return{reg,ot1,ot2,holHours,holOtHours,shortDayHours,shortDayRestHours,shortDayDeductHours,shortDayCount,shortDayRestCount,shortDayDeductCount,hourlyHolHours,base,ot,holPay,actualRestDays,monthlyRestDays,missingRestDays,restOTPay,bonus:emp.bonus||0,
     laborPersonal,laborCompany,healthPersonal,healthCompany,insuranceDeduct,total};
   }catch(e){
     console.error("calcWage error",emp?.name,e);
-    return{reg:0,ot1:0,ot2:0,holHours:0,holOtHours:0,shortDayHours:0,shortDayCount:0,shortDayRestCount:0,shortDayDeductCount:0,hourlyHolHours:0,base:0,ot:0,holPay:0,actualRestDays:0,monthlyRestDays:8,missingRestDays:0,restOTPay:0,bonus:0,laborPersonal:0,laborCompany:0,healthPersonal:0,healthCompany:0,insuranceDeduct:0,total:0};
+    return{reg:0,ot1:0,ot2:0,holHours:0,holOtHours:0,shortDayHours:0,shortDayRestHours:0,shortDayDeductHours:0,shortDayCount:0,shortDayRestCount:0,shortDayDeductCount:0,hourlyHolHours:0,base:0,ot:0,holPay:0,actualRestDays:0,monthlyRestDays:8,missingRestDays:0,restOTPay:0,bonus:0,laborPersonal:0,laborCompany:0,healthPersonal:0,healthCompany:0,insuranceDeduct:0,total:0};
   }
 }
 
@@ -360,9 +361,9 @@ function SalaryEmpCard({emp,recs,schedRecs,w,S,storeName,vy,vm}){
           {(()=>{
             const rows=[];
             if(emp.salary_type==="monthly"){
-              rows.push({l:"底薪（月薪制）",v:`NT$ ${Math.round(emp.monthly_rate).toLocaleString()}`});
+              rows.push({l:"底薪（月薪制）",v:`NT$ ${Math.round(emp.monthly_rate||0).toLocaleString()}`});
               if(w.shortDayDeductCount>0)
-                rows.push({l:`　扣：短日${w.shortDayDeductCount}天（各-1/30底薪）`,v:`-NT$ ${Math.round(w.shortDayDeductCount*(emp.monthly_rate/30)).toLocaleString()}`,neg:true});
+                rows.push({l:`　扣：短日${w.shortDayDeductCount}天（各-1/30底薪）`,v:`-NT$ ${Math.round(w.shortDayDeductCount*((emp.monthly_rate||0)/30)).toLocaleString()}`,neg:true});
               if(w.shortDayDeductHours>0)
                 rows.push({l:`　補：短日時薪 ${w.shortDayDeductHours.toFixed(1)}h`,v:`+NT$ ${Math.round(w.shortDayDeductHours*emp.hourly_rate).toLocaleString()}`});
               if(w.shortDayRestHours>0)
