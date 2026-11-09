@@ -306,6 +306,7 @@ function SalaryEmpCard({emp,recs,schedRecs,w,S,storeName,vy,vm}){
             {l:"正班工時",v:`${w.reg.toFixed(1)} h`},
             (w.ot1+w.ot2+w.holOtHours)>0&&{l:"加班工時",v:`${(w.ot1+w.ot2+w.holOtHours).toFixed(1)} h`},
             {l:emp.salary_type==="monthly"?"底薪":"正班薪資",v:`NT$ ${Math.round(w.base).toLocaleString()}`},
+            emp.salary_type==="hourly"&&w.hourlyHolHours>0&&{l:`國定假日 ${w.hourlyHolHours.toFixed(1)}h ×1.34`,v:`NT$ ${Math.round(w.hourlyHolHours*0.34*emp.hourly_rate).toLocaleString()} 加給`},
             (w.ot)>0&&{l:"加班費",v:`NT$ ${Math.round(w.ot).toLocaleString()}`},
             emp.salary_type==="monthly"&&w.holPay>0&&{l:"國定假日補發",v:`NT$ ${Math.round(w.holPay).toLocaleString()}`},
             emp.salary_type==="monthly"&&w.restOTPay>0&&{l:`少休${w.missingRestDays}天加班費`,v:`NT$ ${Math.round(w.restOTPay).toLocaleString()}`},
