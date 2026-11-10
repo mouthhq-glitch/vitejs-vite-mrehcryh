@@ -56,7 +56,11 @@ function calcWage(emp, recs, schedRecs){
   const today=fmt(new Date());
   const monthlyRestDays=+(emp.monthly_rest_days||8);
   const dailyH=+(emp.daily_hours||8);
-  const rate=+(emp.hourly_rate||0);
+  const monthlyRate=+(emp.monthly_rate||0);
+  // 月薪員工：時薪 = 月薪 ÷ 30 ÷ 每日工時；時薪員工：直接用 hourly_rate
+  const rate=emp.salary_type==="monthly"
+    ? (monthlyRate>0 ? monthlyRate/30/dailyH : +(emp.hourly_rate||0))
+    : +(emp.hourly_rate||0);
 
   if(emp.salary_type==="monthly"){
     // 第一步：先算到今天為止的排班休假天數（不含短日）
@@ -149,7 +153,6 @@ function calcWage(emp, recs, schedRecs){
   const shortDayCount=shortDayRestCount+shortDayDeductCount;
   const shortDayHours=shortDayRestHours+shortDayDeductHours;
 
-  const monthlyRate=+(emp.monthly_rate||0);
   const dailyRate=emp.salary_type==="monthly"?(monthlyRate/30):0;
   const base=emp.salary_type==="monthly"
     // 底薪 - 扣薪短日×(1/30底薪) + 扣薪短日時薪 + 加班短日時薪×1.34
